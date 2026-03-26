@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中国象棋 Pro17 - 最终无暇版</title>
+    <style>
+        :root { --bg: #212121; --panel: #2c2c2e; --text: #e0e0e0; --accent: #0a84ff; --red: #ff453a; --black: #30d158; --border: rgba(255,255,255,0.15); }
+        body { margin: 0; background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-font-smoothing: antialiased; }
+        .header { height: 44px; background: rgba(44, 44, 46, 0.95); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+        .main-layout { flex: 1; display: flex; padding: 20px; gap: 20px; height: calc(100% - 44px); box-sizing: border-box; align-items: center; justify-content: center; }
+        .board-wrap { height: 100%; width: auto; aspect-ratio: 9/10; background: #2b2b2b; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; border: 1px solid var(--border); position: relative; max-width: 100%; }
+        canvas { border-radius: 4px; width: 100%; height: 100%; display: block; }
+        .sidebar { width: 280px; height: 100%; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+        .panel { background: var(--panel); border-radius: 10px; padding: 15px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status-row { display: flex; align-items: center; margin-bottom: 12px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; margin-right: 8px; transition: 0.3s; }
+        .dot.thinking { background: #ffd60a; box-shadow: 0 0 8px #ffd60a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        .timer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .t-cell { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid transparent; transition: 0.3s; position: relative; overflow: hidden; }
+        .t-cell.active { background: rgba(255,255,255,0.08); border-color: var(--accent); }
+        .t-val { display: block; font-family: "SF Mono", monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+        .t-lbl { font-size: 10px; opacity: 0.6; margin-top: 2px; }
+        .step-timer { margin-top: 4px; font-size: 12px; color: #ffd60a; font-family: "SF Mono", monospace; height: 16px; transition: color 0.3s; }
+        .step-timer.urgent { color: #ff453a; font-weight: bold; animation: urgent-pulse 0.5s infinite alternate; }
+        @keyframes urgent-pulse { from { opacity: 1; } to { opacity: 0.6; } }
+
+        .score-wrap { margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
+        .score-labels { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 6px; }
+        .score-bar-bg { height: 6px; background: var(--black); border-radius: 3px; overflow: hidden; display: flex; }
+        .score-bar-fill { height: 100%; background: var(--red); width: 50%; transition: width 0.5s ease-in-out; }
+
+        label { font-size: 11px; color: #aaa; display: block; margin-bottom: 6px; }
+        select { width: 100%; background: #3a3a3c; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 6px; font-size: 12px; outline: none; }
+        
+        .log-box { flex: 1; min-height: 0; background: #151515; border-radius: 6px; padding: 10px; font-family: "SF Mono", monospace; font-size: 11px; color: #a1c9f7; overflow-y: auto; border: 1px solid #333; scroll-behavior: smooth; }
+        .log-line { margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
+        .log-line.warn { color: #ffab00; }
+        .log-line.sys { color: #30d158; opacity: 0.8; }
+        .log-cap { color: #ff453a; font-weight: bold; } 
+        
+        .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; transition: 0.2s; }
+        button:active { transform: scale(0.96); }
+        button.sec { background: #3a3a3c; }
+        @media (max-width: 800px) { .main-layout { flex-direction: column; padding: 10px; } .board-wrap { width: 100%; flex: 1; max-height: 60vh; } .sidebar { width: 100%; height: auto; flex: none; } .log-box { min-height: 80px; max-height: 120px; } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <span>CHINESE CHESS <span style="color:var(--accent)">PRO</span></span>
+    <span style="font-size:11px; opacity:0.7">64位防碰撞引擎 + 剪枝逻辑修复版</span>
+</div>
+
+<div class="main-layout">
+    <div class="board-wrap" id="boardContainer">
+        <canvas id="board"></canvas>
+    </div>
+
+    <div class="sidebar">
+        <div class="panel">
+            <div class="status-row">
+                <span class="dot" id="statusDot"></span>
+                <span id="statusText" style="font-size:13px; font-weight:bold;">等待开局</span>
+            </div>
+            
+            <div class="timer-grid">
+                <div class="t-cell" id="cellR">
+                    <span class="t-val" style="color:var(--red)" id="timeR">20:00</span>
+                    <span class="t-lbl">红方(局时)</span>
+                    <div class="step-timer" id="stepR"></div>
+                </div>
+                <div class="t-cell" id="cellB">
+                    <span class="t-val" style="color:var(--black)" id="timeB">20:00</span>
+                    <span class="t-lbl">黑方(局时)</span>
+                    <div class="step-timer" id="stepB"></div>
+                </div>
+            </div>
+
+            <div class="score-wrap">
+                <div class="score-labels">
+                    <span>红方</span><span id="scoreText" style="color:#fff; font-weight:bold;">势均力敌</span><span>黑方</span>
+                </div>
+                <div class="score-bar-bg">
+                    <div class="score-bar-fill" id="scoreBar"></div>
+                </div>
+            </div>
+
+            <label>AI 算力深度</label>
+            <select id="depth">
+                <option value="3">快速 (L1)</option>
+                <option value="4" selected>标准 (L2)</option>
+                <option value="5">强力 (L3)</option>
+            </select>
+
+            <label style="margin-top: 12px;">开局让子 (黑方让子)</label>
+            <select id="handicap" onchange="Game.restart()">
+                <option value="0" selected>公平对决 (无让子)</option>
+                <option value="1">让左马 (黑方让一马)</option>
+                <option value="2">让双马 (黑方让双马)</option>
+                <option value="3">让双车 (黑方让双车)</option>
+            </select>
+        </div>
+
+        <div class="panel" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+            <div class="log-box" id="log"></div>
+            <div class="btn-row">
+                <button onclick="Game.restart()">重新开始</button>
+                <button class="sec" onclick="Game.undo()">悔棋</button>
+                <button class="sec" style="background:#ff9f0a; color:#fff;" onclick="Game.hint()">💡提示</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="worker-code" type="javascript/worker">
+    // --- Worker: 核心算法与规则检查 ---
+    const Rules = {
+        isLegal(map, myColorIsRed) {
+            let rK = null, bK = null;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                if(map[r][c] === 'K') rK = {c, r};
+                if(map[r][c] === 'k') bK = {c, r};
+            }
+            if(!rK || !bK) return true; 
+            if(rK.c === bK.c) {
+                let count = 0;
+                for(let r = bK.r + 1; r < rK.r; r++) { if(map[r][rK.c]) count++; }
+                if(count === 0) return false;
+            }
+            const myKing = myColorIsRed ? rK : bK;
+            const enemyColorLower = myColorIsRed;
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            for(let d of dirs) {
+                let jump = false, c = myKing.c + d[0], r = myKing.r + d[1];
+                while(c>=0 && c<9 && r>=0 && r<10) {
+                    const p = map[r][c];
+                    if(p) {
+                        const type = p.toLowerCase();
+                        const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                        if(isEnemy) {
+                            if(!jump) {
+                                if(type === 'r' || type === 'k') return false; 
+                                if(type === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
+                                    if(enemyColorLower && r > myKing.r) {} else if(!enemyColorLower && r < myKing.r) {} else return false; 
+                                }
+                            } else { if(type === 'c') return false; }
+                        }
+                        if(p) { if(jump) break; jump = true; }
+                    }
+                    c += d[0]; r += d[1];
+                }
+            }
+            const knights = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+            for(let k of knights) {
+                const c = myKing.c + k[0], r = myKing.r + k[1];
+                if(c>=0 && c<9 && r>=0 && r<10) {
+                    const p = map[r][c];
+                    if(p) {
+                        const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                        if(isEnemy && p.toLowerCase() === 'n') {
+                            const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : k[0]);
+                            const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : k[1]);
+                            if(!map[legR][legC]) return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+    };
+
+    const C = {
+        vals: { 'k':10000, 'c':450, 'n':400, 'r':900, 'b':200, 'a':200, 'p':100, 'm':400, 'x':900, 's':200, 'j':200 },
+        pst: { 
+            p: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[10,0,20,0,20,0,20,0,10],[20,20,30,40,50,40,30,20,20],[30,30,40,50,60,50,40,30,30],[30,30,40,50,60,50,40,30,30],[0,0,0,0,0,0,0,0,0]],
+            r: [[0,0,0,0,0,0,0,0,0],[-2,10,5,10,10,10,5,10,-2],[0,0,5,0,0,0,5,0,0],[0,0,5,0,0,0,5,0,0],[0,4,8,12,15,12,8,4,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[2,6,8,10,12,10,8,6,2],[2,6,8,10,12,10,8,6,2]],
+            n: [[0,-4,-2,0,0,0,-2,-4,0],[-2,2,3,4,2,4,3,2,-2],[0,3,6,8,10,8,6,3,0],[0,2,6,10,12,10,6,2,0],[0,2,6,10,12,10,6,2,0],[0,3,8,10,14,10,8,3,0],[0,3,8,10,14,10,8,3,0],[0,2,5,8,10,8,5,2,0],[-2,2,3,4,3,4,3,2,-2],[-2,-5,-2,0,0,0,-2,-5,-2]],
+            c: [[0,0,1,3,4,3,1,0,0],[0,1,2,3,4,3,2,1,0],[1,1,4,4,6,4,4,1,1],[0,0,2,4,6,4,2,0,0],[0,0,0,0,5,0,0,0,0],[0,0,0,0,5,0,0,0,0],[0,0,1,2,4,2,1,0,0],[1,1,4,5,6,5,4,1,1],[0,1,2,3,3,3,2,1,0],[0,0,1,2,2,2,1,0,0]],
+            m: [], x: [] 
+        }
+    };
+    C.pst.m = C.pst.n; C.pst.x = C.pst.r;
+
+    // 【新增：64位 BigInt 哈希，彻底消灭 TT 碰撞幻觉】
+    const Zobrist = {
+        table: new BigInt64Array(14 * 10 * 9),
+        key: 0n,
+        pieceMap: { 'k':0, 'a':1, 'b':2, 'n':3, 'r':4, 'c':5, 'p':6, 'K':7, 'A':8, 'B':9, 'N':10, 'R':11, 'C':12, 'P':13, 'j':0, 's':1, 'x':2, 'm':3 },
+        init() { 
+            for(let i=0; i<this.table.length; i++) {
+                const h = BigInt(Math.floor(Math.random() * 0xFFFFFFFF));
+                const l = BigInt(Math.floor(Math.random() * 0xFFFFFFFF));
+                this.table[i] = (h << 32n) | l;
+            }
+        },
+        computeFull(map) {
+            this.key = 0n;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) if(map[r][c]) this.toggle(map[r][c], r, c);
+            return this.key;
+        },
+        toggle(piece, r, c) {
+            const pIdx = this.pieceMap[piece];
+            if (pIdx !== undefined) this.key ^= this.table[pIdx * 90 + r * 9 + c];
+        }
+    };
+    Zobrist.init();
+
+    const TT = {
+        map: new Map(), MAX_SIZE: 500000,
+        store(key, depth, val, flag, isMax) {
+            if(this.map.size > this.MAX_SIZE) this.map.clear();
+            this.map.set(key, { d: depth, v: val, f: flag, m: isMax });
+        },
+        probe(key, depth, alpha, beta, isMax) {
+            const entry = this.map.get(key);
+            if(entry && entry.d >= depth && entry.m === isMax) {
+                if(entry.f === 0) return entry.v; 
+                if(entry.f === 1 && entry.v <= alpha) return entry.v; 
+                if(entry.f === 2 && entry.v >= beta) return entry.v; 
+            }
+            return null;
+        }
+    };
+
+    const Engine = {
+        historyTable: null, killers: null, path: new BigInt64Array(100), 
+        val_c: 450, val_n: 400,
+        
+        eval(map) {
+            let s = 0;
+            let rKing = null, bKing = null;
+            let rA = 0, rE = 0, bA = 0, bE = 0;
+
+            for(let r=0; r<10; r++) {
+                for(let c=0; c<9; c++) {
+                    const k = map[r][c];
+                    if(!k) continue;
+                    const t = k.toLowerCase(), isRed = k<'a';
+                    
+                    let v = 0;
+                    if(t==='c') v = this.val_c;
+                    else if(t==='n') v = this.val_n;
+                    else v = C.vals[t] || 0;
+
+                    if(C.pst[t]) v += C.pst[t][isRed ? 9-r : r][c] || 0;
+                    
+                    // 【核心修复：绝对分数体系】红正黑负
+                    s += isRed ? v : -v;
+
+                    if (k === 'K') rKing = {r, c};
+                    else if (k === 'k') bKing = {r, c};
+                    else if (k === 'A' || k === 'S') rA++;
+                    else if (k === 'B' || k === 'X') rE++;
+                    else if (k === 'a' || k === 's') bA++;
+                    else if (k === 'b' || k === 'x') bE++;
+                }
+            }
+
+            // 【核心修复：防守缺失惩罚正确倒置】
+            if (rA < 2) s -= (2 - rA) * 60; // 红缺士，扣红分(利黑)
+            if (rE < 2) s -= (2 - rE) * 50; 
+            if (bA < 2) s += (2 - bA) * 60; // 黑缺士，加红分(利红)
+            if (bE < 2) s += (2 - bE) * 50; 
+
+            for(let r=0; r<10; r++) {
+                for(let c=0; c<9; c++) {
+                    const k = map[r][c];
+                    if(!k) continue;
+                    const isRed = k<'a';
+                    const t = k.toLowerCase();
+
+                    let mobility = 0;
+                    let threat = 0;
+
+                    if (t === 'r') {
+                        let count = 0;
+                        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                        for(let i=0; i<4; i++) {
+                            let nc = c + dirs[i][0], nr = r + dirs[i][1];
+                            while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                                if(!map[nr][nc]) count++; else break;
+                                nc += dirs[i][0]; nr += dirs[i][1];
+                            }
+                        }
+                        mobility = count * 2; 
+                        
+                        if (isRed && bKing && c === bKing.c) threat += 30;
+                        if (!isRed && rKing && c === rKing.c) threat += 30;
+
+                    } else if (t === 'c') {
+                        let count = 0;
+                        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                        for(let i=0; i<4; i++) {
+                            let nc = c + dirs[i][0], nr = r + dirs[i][1];
+                            while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                                if(!map[nr][nc]) count++; else break;
+                                nc += dirs[i][0]; nr += dirs[i][1];
+                            }
+                        }
+                        mobility = count * 1; 
+
+                        if (isRed && bKing && c === bKing.c) {
+                            let piecesBetween = 0;
+                            for(let i=Math.min(r, bKing.r)+1; i<Math.max(r, bKing.r); i++) {
+                                if(map[i][c]) piecesBetween++;
+                            }
+                            if (piecesBetween === 0) threat += 150; 
+                            else if (piecesBetween === 1 && r > 4) threat += 40; 
+                        }
+                        if (!isRed && rKing && c === rKing.c) {
+                            let piecesBetween = 0;
+                            for(let i=Math.min(r, rKing.r)+1; i<Math.max(r, rKing.r); i++) {
+                                if(map[i][c]) piecesBetween++;
+                            }
+                            if (piecesBetween === 0) threat += 150; 
+                            else if (piecesBetween === 1 && r < 5) threat += 40; 
+                        }
+
+                    } else if (t === 'n') {
+                        let count = 0;
+                        const moves = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+                        for(let i=0; i<8; i++) {
+                            const d = moves[i];
+                            const tc = c + d[0], tr = r + d[1];
+                            if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
+                                const legC = c + (Math.abs(d[0])===2 ? d[0]/2 : 0);
+                                const legR = r + (Math.abs(d[1])===2 ? d[1]/2 : 0);
+                                if(!map[legR][legC]) count++;
+                            }
+                        }
+                        mobility = count * 3; 
+                        // 鼓励马占中
+                        if (c >= 2 && c <= 6) mobility += 15;
+                    }
+
+                    // 【核心修复：绝对分数体系】红正黑负
+                    s += isRed ? (mobility + threat) : -(mobility + threat);
+                }
+            }
+            return s;
+        },
+        genMoves(map, isRed, onlyCaptures=false, ply=-1) {
+            const moves = [];
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                const k = map[r][c];
+                if(!k || (isRed && k>='a') || (!isRed && k<'a')) continue;
+                
+                const t = k.toLowerCase();
+                const addMove = (tc, tr) => {
+                    if(tc < 0 || tc > 8 || tr < 0 || tr > 9) return;
+                    const target = map[tr][tc];
+                    const isCapture = target !== 0 && ((isRed && target >='a') || (!isRed && target < 'a'));
+                    if (onlyCaptures && !isCapture) return;
+                    if (target && !isCapture) return; 
+
+                    let sortScore = 0;
+                    if (isCapture) {
+                        let tv=0, av=0;
+                        const tt = target.toLowerCase();
+                        if(tt==='c') tv = Engine.val_c; else if(tt==='n') tv = Engine.val_n; else tv = C.vals[tt]||0;
+                        if(t==='c') av = Engine.val_c; else if(t==='n') av = Engine.val_n; else av = C.vals[t]||0;
+                        sortScore = 100000 + (tv * 10) - av;
+                    } else {
+                        if (ply >= 0 && Engine.killers && Engine.killers[ply]) {
+                            if (Engine.killers[ply][0] && Engine.killers[ply][0].fc===c && Engine.killers[ply][0].fr===r && Engine.killers[ply][0].tc===tc && Engine.killers[ply][0].tr===tr) sortScore = 90000;
+                            else if (Engine.killers[ply][1] && Engine.killers[ply][1].fc===c && Engine.killers[ply][1].fr===r && Engine.killers[ply][1].tc===tc && Engine.killers[ply][1].tr===tr) sortScore = 80000;
+                        }
+                        if (sortScore === 0) {
+                            let hist = Engine.historyTable ? Engine.historyTable[(r*9+c)*90 + (tr*9+tc)] : 0;
+                            if (hist > 70000) hist = 70000; // 防止历史表膨胀掩盖吃子得分
+                            sortScore = hist + (C.pst[t] ? (C.pst[t][isRed ? 9-tr : tr][tc] || 0) : 0);
+                        }
+                    }
+                    moves.push({fc: c, fr: r, tc, tr, val: sortScore, isCapture: isCapture});
+                };
+
+                if(t==='r' || t==='c') {
+                    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dc,dr])=>{
+                        let nc=c+dc, nr=r+dr, jump=false;
+                        while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                            const tg = map[nr][nc];
+                            if(t==='r') { if(!tg) addMove(nc,nr); else { addMove(nc,nr); break; } }
+                            else {
+                                if(!tg && !jump) addMove(nc,nr);
+                                else if(tg && !jump) jump=true;
+                                else if(tg && jump) { addMove(nc,nr); break; }
+                            }
+                            nc+=dc; nr+=dr;
+                        }
+                    });
+                } else if(t==='n') {
+                    [[-1,-2],[-1,2],[1,-2],[1,2],[-2,-1],[-2,1],[2,-1],[2,1]].forEach(([dc,dr])=>{
+                        const tc=c+dc, tr=r+dr;
+                        if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
+                            if(!map[r+(Math.abs(dr)===2?dr/2:0)][c+(Math.abs(dc)===2?dc/2:0)]) addMove(tc, tr);
+                        }
+                    });
+                } else if(t==='p') {
+                    addMove(c, r + (isRed ? -1 : 1));
+                    if(isRed ? r<=4 : r>=5) { addMove(c-1,r); addMove(c+1,r); }
+                } else if(t==='k' || t==='a' || t==='j' || t==='s') {
+                     [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
+                        if((t==='k'||t==='j')&&dc*dr!==0) return; if((t==='a'||t==='s')&&dc*dr===0) return;
+                        const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) addMove(nc,nr);
+                     });
+                     // 【完美修补：引入飞将秒杀，防止AI自己暴露老将】
+                     if (t==='k' || t==='j') {
+                         let nr = r + (isRed ? -1 : 1);
+                         while(nr >= 0 && nr <= 9) {
+                             const tg = map[nr][c];
+                             if (tg) {
+                                 if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); // 可以吃掉对面老将
+                                 break;
+                             }
+                             nr += (isRed ? -1 : 1);
+                         }
+                     }
+                } else if(t==='b' || t==='x') {
+                    [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(([dc,dr])=>{
+                        const tc=c+dc, tr=r+dr;
+                        if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                            const br=r+dr/2, bc=c+dc/2;
+                            if(br>=0&&br<10&&bc>=0&&bc<9 && !map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc, tr); }
+                        }
+                    });
+                }
+            }
+            return moves.sort((a,b) => b.val - a.val);
+        },
+        quiesce(map, alpha, beta, isMax) {
+            let stand_pat = this.eval(map);
+            // 【致命修补：best必须从stand_pat起步，杜绝“吃子不如站着”的幻觉】
+            let best = stand_pat;
+
+            if (isMax) {
+                if (stand_pat >= beta) return stand_pat;
+                alpha = Math.max(alpha, stand_pat);
+            } else {
+                if (stand_pat <= alpha) return stand_pat;
+                beta = Math.min(beta, stand_pat);
+            }
+
+            const moves = this.genMoves(map, isMax, true, -1); 
+            for(let m of moves) {
+                const t = map[m.tr][m.tc];
+                if(t && (t==='k'||t==='K')) return isMax ? 10000 : -10000;
+                
+                map[m.tr][m.tc] = map[m.fr][m.fc]; map[m.fr][m.fc] = 0;
+                const val = this.quiesce(map, alpha, beta, !isMax);
+                map[m.fr][m.fc] = map[m.tr][m.tc]; map[m.tr][m.tc] = t;
+
+                if(isMax) { 
+                    best = Math.max(best, val); 
+                    alpha = Math.max(alpha, best); 
+                } else { 
+                    best = Math.min(best, val); 
+                    beta = Math.min(beta, best); 
+                }
+                if(beta <= alpha) break;
+            }
+            return best;
+        },
+        search(map, depth, alpha, beta, isMax, ply) {
+            // 【修补懦夫平局 (Contempt Factor)】：发现搜索树重复，给予严厉惩罚 (-500/500)，逼迫AI进攻
+            for (let i = 0; i < ply; i++) {
+                if (this.path[i] === Zobrist.key) return isMax ? -500 : 500; 
+            }
+            this.path[ply] = Zobrist.key;
+
+            const ttVal = TT.probe(Zobrist.key, depth, alpha, beta, isMax);
+            if(ttVal !== null) return ttVal;
+            
+            if(depth === 0) return this.quiesce(map, alpha, beta, isMax);
+
+            const moves = this.genMoves(map, isMax, false, ply);
+            let best = isMax ? -Infinity : Infinity;
+            
+            const oldAlpha = alpha;
+            const oldBeta = beta;
+
+            for(let m of moves) {
+                const t = map[m.tr][m.tc];
+                if(t && (t==='k'||t==='K')) return isMax ? 10000 + depth : -10000 - depth;
+                
+                Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc); 
+                if(t) Zobrist.toggle(t, m.tr, m.tc);         
+                Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc); 
+                
+                map[m.tr][m.tc] = map[m.fr][m.fc]; map[m.fr][m.fc] = 0;
+                const val = this.search(map, depth-1, alpha, beta, !isMax, ply + 1);
+                
+                map[m.fr][m.fc] = map[m.tr][m.tc]; map[m.tr][m.tc] = t;
+                Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
+                if(t) Zobrist.toggle(t, m.tr, m.tc);
+                Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
+
+                if(isMax) {
+                    if (val > best) best = val;
+                    alpha = Math.max(alpha, best);
+                } else {
+                    if (val < best) best = val;
+                    beta = Math.min(beta, best);
+                }
+                
+                if(beta <= alpha) { 
+                    if (!m.isCapture && ply < 64) {
+                        if (!this.killers[ply][0] || this.killers[ply][0].fc !== m.fc || this.killers[ply][0].fr !== m.fr || this.killers[ply][0].tc !== m.tc || this.killers[ply][0].tr !== m.tr) {
+                            this.killers[ply][1] = this.killers[ply][0];
+                            this.killers[ply][0] = m;
+                        }
+                        this.historyTable[(m.fr*9+m.fc)*90 + (m.tr*9+m.tc)] += depth * depth;
+                    }
+                    break; 
+                }
+            }
+
+            // 【致命修补：完美对齐的标志位计算】杜绝下界污染
+            let flag = 0; // Exact
+            if (best <= oldAlpha) flag = 1; // Upperbound
+            else if (best >= oldBeta) flag = 2; // Lowerbound
+            
+            TT.store(Zobrist.key, depth, best, flag, isMax);
+            return best;
+        },
+        think(map, depth, historyKeys, isHint = false) {
+            const strKey = map.flat().join('');
+            const initialKey = "rnbakabnr0000000000c00000c0p0p0p0p0p000000000000000000P0P0P0P0P0C00000C0000000000RNBAKABNR";
+            if (strKey === initialKey && historyKeys.length === 1 && !isHint) {
+                const book = [ {fc:1, fr:0, tc:2, tr:2}, {fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:2, tc:4, tr:2}, {fc:7, fr:2, tc:4, tr:2} ];
+                return book[Math.floor(Math.random() * book.length)];
+            }
+
+            Zobrist.computeFull(map);
+            TT.map.clear();
+            this.killers = Array.from({length: 64}, () => [null, null]);
+            this.historyTable = new Int32Array(8100);
+            this.path[0] = Zobrist.key; 
+
+            let phaseMat = 0;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                const k = map[r][c];
+                if(k) { const t=k.toLowerCase(); if(t==='r'||t==='c'||t==='n') phaseMat++; }
+            }
+            let phase = phaseMat / 12.0; if(phase>1) phase=1;
+            this.val_c = Math.floor(350 + 100 * phase);
+            this.val_n = Math.floor(450 - 50 * phase);
+
+            let bestMove = null;
+            const isRedTurn = isHint; 
+            const moves = this.genMoves(map, isRedTurn, false, 0); 
+            if(moves.length === 0) return null; 
+
+            const validMoves = [];
+            for(let m of moves) {
+                const saveT = map[m.tr][m.tc];
+                const saveF = map[m.fr][m.fc];
+                map[m.tr][m.tc] = saveF; map[m.fr][m.fc] = 0;
+                
+                const legal = Rules.isLegal(map, isRedTurn);
+                const kStr = map.flat().join(''); 
+                const count = historyKeys.filter(k => k === kStr).length;
+                
+                map[m.fr][m.fc] = saveF; map[m.tr][m.tc] = saveT;
+                
+                // 【核心：根节点避让机制】
+                if(legal) {
+                    if (count >= 2) { continue; } // 如果已经重复，绝对不走
+                    validMoves.push(m);
+                }
+            }
+            if(validMoves.length === 0) return null;
+
+            for(let d=1; d<=depth; d++) {
+                let bestVal = isRedTurn ? -Infinity : Infinity; 
+                let alpha = -Infinity, beta = Infinity;
+                const noise = (Math.random() - 0.5) * 0.5;
+
+                for(let i=0; i<validMoves.length; i++) {
+                    const m = validMoves[i];
+                    const t = map[m.tr][m.tc];
+                    
+                    Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
+                    if(t) Zobrist.toggle(t, m.tr, m.tc);
+                    Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
+                    map[m.tr][m.tc] = map[m.fr][m.fc]; map[m.fr][m.fc] = 0;
+                    
+                    const val = this.search(map, d-1, alpha, beta, !isRedTurn, 1) + noise;
+                    
+                    map[m.fr][m.fc] = map[m.tr][m.tc]; map[m.tr][m.tc] = t;
+                    Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
+                    if(t) Zobrist.toggle(t, m.tr, m.tc);
+                    Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
+
+                    if (isRedTurn) {
+                        if (val > bestVal) { bestVal = val; bestMove = m; }
+                        alpha = Math.max(alpha, bestVal); 
+                    } else {
+                        if (val < bestVal) { bestVal = val; bestMove = m; }
+                        beta = Math.min(beta, bestVal); 
+                    }
+                }
+            }
+            return bestMove;
+        }
+    };
+    
+    onmessage = e => {
+        if(e.data.type === 'go') {
+            const ret = Engine.think(e.data.map, e.data.depth, e.data.historyKeys || [], e.data.isHint || false);
+            if (e.data.isHint) {
+                postMessage({type:'hint', move:ret});
+            } else {
+                postMessage({type:'done', move:ret});
+            }
+        }
+    }
+</script>
+
+<script>
+const EvalC = {
+    vals: { 'k':10000, 'c':450, 'n':400, 'r':900, 'b':200, 'a':200, 'p':100, 'm':400, 'x':900, 's':200, 'j':200 },
+    pst: { 
+        p: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[10,0,20,0,20,0,20,0,10],[20,20,30,40,50,40,30,20,20],[30,30,40,50,60,50,40,30,30],[30,30,40,50,60,50,40,30,30],[0,0,0,0,0,0,0,0,0]],
+        r: [[0,0,0,0,0,0,0,0,0],[-2,10,5,10,10,10,5,10,-2],[0,0,5,0,0,0,5,0,0],[0,0,5,0,0,0,5,0,0],[0,4,8,12,15,12,8,4,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[2,6,8,10,12,10,8,6,2],[2,6,8,10,12,10,8,6,2]],
+        n: [[0,-4,-2,0,0,0,-2,-4,0],[-2,2,3,4,2,4,3,2,-2],[0,3,6,8,10,8,6,3,0],[0,2,6,10,12,10,6,2,0],[0,2,6,10,12,10,6,2,0],[0,3,8,10,14,10,8,3,0],[0,3,8,10,14,10,8,3,0],[0,2,5,8,10,8,5,2,0],[-2,2,3,4,3,4,3,2,-2],[-2,-5,-2,0,0,0,-2,-5,-2]],
+        c: [[0,0,1,3,4,3,1,0,0],[0,1,2,3,4,3,2,1,0],[1,1,4,4,6,4,4,1,1],[0,0,2,4,6,4,2,0,0],[0,0,0,0,5,0,0,0,0],[0,0,0,0,5,0,0,0,0],[0,0,1,2,4,2,1,0,0],[1,1,4,5,6,5,4,1,1],[0,1,2,3,3,3,2,1,0],[0,0,1,2,2,2,1,0,0]]
+    }
+};
+
+// 【核心修复：确保主界面马腿检测与引擎一致】
+const Rules = {
+    isLegal(map, myColorIsRed) {
+        let rK = null, bK = null;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            if(map[r][c] === 'K') rK = {c, r};
+            if(map[r][c] === 'k') bK = {c, r};
+        }
+        if(!rK || !bK) return true; 
+        if(rK.c === bK.c) {
+            let count = 0;
+            for(let r = bK.r + 1; r < rK.r; r++) if(map[r][rK.c]) count++;
+            if(count === 0) return false;
+        }
+        const myKing = myColorIsRed ? rK : bK;
+        const enemyColorLower = myColorIsRed;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        for(let d of dirs) {
+            let jump = false, c = myKing.c + d[0], r = myKing.r + d[1];
+            while(c>=0 && c<9 && r>=0 && r<10) {
+                const p = map[r][c];
+                if(p) {
+                    const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                    if(isEnemy) {
+                        const t = p.toLowerCase();
+                        if(!jump) {
+                            if(t === 'r' || t === 'k') return false; 
+                            if(t === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
+                                if(enemyColorLower && r > myKing.r) {} else if(!enemyColorLower && r < myKing.r) {} else return false; 
+                            }
+                        } else if(t === 'c') return false;
+                    }
+                    if(p) { if(jump) break; jump = true; }
+                }
+                c += d[0]; r += d[1];
+            }
+        }
+        const knights = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+        for(let k of knights) {
+            const c = myKing.c + k[0], r = myKing.r + k[1];
+            if(c>=0 && c<9 && r>=0 && r<10) {
+                const p = map[r][c];
+                if(p) {
+                    const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                    if(isEnemy && p.toLowerCase() === 'n') {
+                        const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : k[0]);
+                        const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : k[1]);
+                        if(!map[legR][legC]) return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+};
+
+const Sound = {
+    ctx: null,
+    init() { try { const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC(); } catch(e) {} },
+    play(type) {
+        if(!this.ctx) this.init();
+        if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        if(type === 'select') {
+            osc.frequency.setValueAtTime(600, t); osc.frequency.exponentialRampToValueAtTime(300, t+0.05);
+            gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.05);
+            osc.start(t); osc.stop(t+0.05);
+        } else if(type === 'move') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(50, t+0.1);
+            gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.1);
+            osc.start(t); osc.stop(t+0.1);
+        } else if(type === 'capture') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(100, t+0.15);
+            gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.15);
+            osc.start(t); osc.stop(t+0.15);
+        } else if(type === 'win') {
+            this.playTone(523, t, 0.2); this.playTone(659, t+0.1, 0.2); this.playTone(783, t+0.2, 0.4);
+        } else if(type === 'lose') {
+            this.playTone(300, t, 0.4); this.playTone(200, t+0.3, 0.6);
+        } else if(type === 'warn') {
+            this.playTone(150, t, 0.2);
+        } else if(type === 'check') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(800, t); osc.frequency.exponentialRampToValueAtTime(300, t+0.3);
+            gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.3);
+            osc.start(t); osc.stop(t+0.3);
+        }
+    },
+    playTone(freq, t, dur) {
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, t); gain.gain.linearRampToValueAtTime(0, t+dur);
+        osc.start(t); osc.stop(t+dur);
+    }
+};
+
+const View = {
+    cvs: document.getElementById('board'), ctx: null, grid: 0, margin: 0,
+    init() {
+        this.ctx = this.cvs.getContext('2d');
+        window.addEventListener('resize', () => { this.resize(); if(Game.map) Game.draw(); });
+        this.resize();
+    },
+    resize() {
+        const box = document.getElementById('boardContainer');
+        const dpr = window.devicePixelRatio || 2;
+        let w = box.clientWidth, h = box.clientHeight;
+        if(w===0) w=350; if(h===0) h=390;
+        if(w/h > 9/10) w = h*(9/10); else h = w/(9/10);
+        this.cvs.style.width = w+'px'; this.cvs.style.height = h+'px';
+        this.cvs.width = w*dpr; this.cvs.height = h*dpr;
+        this.grid = (w*dpr)/10; this.margin = this.grid;
+        this.grid = (this.cvs.width - 2*this.margin)/8;
+    },
+    draw(map, sel, last, hints=[], anim=null) {
+        if(!this.ctx || !map) return;
+        const ctx = this.ctx, g = this.grid, m = this.margin, W = this.cvs.width, H = this.cvs.height;
+        ctx.fillStyle = '#e6d0a0'; ctx.fillRect(0,0,W,H);
+        
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#8d6e63'; ctx.font = `bold ${g*0.3}px "Microsoft YaHei"`;
+        const colsRed = ['九','八','七','六','五','四','三','二','一'];
+        const colsBlk = ['1','2','3','4','5','6','7','8','9'];
+        for(let c=0; c<9; c++) {
+            ctx.fillText(colsBlk[c], m + c*g, m - g*0.5); 
+            ctx.fillText(colsRed[c], m + c*g, H - m + g*0.5); 
+        }
+        
+        ctx.lineWidth = 2*(window.devicePixelRatio||2); ctx.strokeStyle = '#5d4037'; ctx.lineCap = 'round';
+        ctx.beginPath();
+        for(let i=0; i<10; i++) { ctx.moveTo(m, m+i*g); ctx.lineTo(W-m, m+i*g); }
+        for(let i=0; i<9; i++) {
+            if(i===0||i===8) { ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, H-m); } 
+            else { ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, m+4*g); ctx.moveTo(m+i*g, m+5*g); ctx.lineTo(m+i*g, H-m); }
+        }
+        [[3,0],[3,7]].forEach(([c,r])=>{
+            ctx.moveTo(m+c*g, m+r*g); ctx.lineTo(m+(c+2)*g, m+(r+2)*g);
+            ctx.moveTo(m+(c+2)*g, m+r*g); ctx.lineTo(m+c*g, m+(r+2)*g);
+        });
+        ctx.stroke();
+        
+        ctx.font = `bold ${g*0.6}px "Microsoft YaHei"`;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            if(map[r][c]) this.drawPiece(ctx, map[r][c], m+c*g, m+r*g, g);
+        }
+        if(sel) this.mark(sel.c, sel.r, '#30D158');
+        if(last) { this.mark(last.fc, last.fr, 'rgba(10,132,255,0.6)'); this.mark(last.tc, last.tr, 'rgba(10,132,255,0.8)'); }
+        hints.forEach(h => {
+            ctx.beginPath(); ctx.arc(m+h.tc*g, m+h.tr*g, g*0.12, 0, 6.28); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+        });
+
+        if(anim) {
+            const curX = m + anim.m.fc*g + (anim.m.tc - anim.m.fc)*g * anim.p;
+            const curY = m + anim.m.fr*g + (anim.m.tr - anim.m.fr)*g * anim.p;
+            this.drawPiece(ctx, anim.piece, curX, curY, g);
+        }
+    },
+    drawPiece(ctx, k, x, y, g) {
+        const isRed = k<'a';
+        ctx.beginPath(); ctx.arc(x+g*0.06, y+g*0.06, g*0.44, 0, 6.28); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, g*0.44, 0, 6.28);
+        const grad = ctx.createRadialGradient(x-g*0.1, y-g*0.1, g*0.1, x, y, g*0.44);
+        grad.addColorStop(0, isRed ? '#fff5f5' : '#f0fff4'); grad.addColorStop(1, '#d0d0d0');
+        ctx.fillStyle = grad; ctx.fill();
+        ctx.lineWidth = g*0.03; ctx.strokeStyle = isRed ? '#c0392b' : '#27ae60'; ctx.stroke();
+        ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 2; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+        ctx.fillStyle = isRed ? '#c00' : '#1e8449'; 
+        const txt = {'k':'将','a':'士','b':'象','n':'马','r':'车','c':'炮','p':'卒', 'K':'帅','A':'仕','B':'相','N':'马','R':'车','C':'炮','P':'兵'};
+        ctx.fillText(txt[k]||k, x, y+g*0.03); 
+        ctx.shadowColor = "transparent";
+    },
+    mark(c, r, color) {
+        const x = this.margin + c*this.grid, y = this.margin + r*this.grid, s = this.grid*0.48, l = this.grid*0.15;
+        this.ctx.strokeStyle = color; this.ctx.lineWidth = 3; this.ctx.lineCap = "round";
+        this.ctx.beginPath();
+        [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dx,dy])=>{
+            this.ctx.moveTo(x+dx*s, y+dy*(s-l)); this.ctx.lineTo(x+dx*s, y+dy*s); this.ctx.lineTo(x+dx*(s-l), y+dy*s);
+        });
+        this.ctx.stroke();
+    }
+};
+
+const Particles = {
+    list: [], animating: false,
+    add(x, y, isRed) {
+        const color = isRed ? '#ff453a' : '#30d158'; 
+        for(let i=0; i<25; i++) {
+            this.list.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
+                life: 1.0, color: color, size: Math.random() * 3 + 2
+            });
+        }
+        if(!this.animating) this.animate();
+    },
+    animate() {
+        if(this.list.length === 0) { 
+            this.animating = false; Game.draw(); return; 
+        }
+        this.animating = true;
+        Game.draw();
+        
+        const ctx = View.ctx;
+        for(let i = this.list.length - 1; i >= 0; i--) {
+            let p = this.list[i];
+            p.x += p.vx; p.y += p.vy; 
+            p.vx *= 0.85; p.vy *= 0.85; 
+            p.life -= 0.04; 
+            if(p.life <= 0) { this.list.splice(i, 1); continue; }
+            
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1.0; 
+        requestAnimationFrame(() => this.animate());
+    }
+};
+
+const Game = {
+    map: [], turn: 'r', sel: null, last: null, history: [], historyKeys: [], worker: null, 
+    gameStarted: false, gameOver: false, hintMove: null, movesCount: 0,
+    
+    LIMIT_STEP: 180, LIMIT_GAME: 1200, timers: { r: 1200, b: 1200, step: 180, t: null },
+
+    init() {
+        const fen = [['r','n','b','a','k','a','b','n','r'],[0,0,0,0,0,0,0,0,0],[0,'c',0,0,0,0,0,'c',0],['p',0,'p',0,'p',0,'p',0,'p'],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],['P',0,'P',0,'P',0,'P',0,'P'],[0,'C',0,0,0,0,0,'C',0],[0,0,0,0,0,0,0,0,0],['R','N','B','A','K','A','B','N','R']];
+        
+        const hc = parseInt(document.getElementById('handicap')?.value || '0');
+        if (hc === 1) fen[0][1] = 0; 
+        if (hc === 2) { fen[0][1] = 0; fen[0][7] = 0; } 
+        if (hc === 3) { fen[0][0] = 0; fen[0][8] = 0; } 
+        
+        this.map = JSON.parse(JSON.stringify(fen));
+        this.turn = 'r'; this.sel = null; this.last = null; this.hintMove = null; this.movesCount = 0;
+        this.history = []; this.historyKeys = [this.toKey(this.map)]; 
+        this.gameStarted = false; this.gameOver = false;
+        
+        this.timers = { r: this.LIMIT_GAME, b: this.LIMIT_GAME, step: this.LIMIT_STEP, t: null };
+        
+        if(this.worker) this.worker.terminate();
+        const blob = new Blob([document.getElementById('worker-code').textContent], {type:"text/javascript"});
+        this.worker = new Worker(window.URL.createObjectURL(blob));
+        this.worker.onmessage = e => {
+            if(e.data.type==='done') {
+                if(this.gameOver) return;
+                UI.status("红方走棋", false);
+                if(e.data.move) this.animateMove(e.data.move); 
+                else this.end("AI 认输 / 无棋可走，红方获胜！");
+            }
+            else if(e.data.type==='hint') {
+                UI.status("红方走棋", false);
+                if(e.data.move) {
+                    this.hintMove = e.data.move;
+                    this.draw();
+                    const notStr = this.getNotation(this.map, e.data.move);
+                    UI.log(`💡 提示: 最佳走法 [${notStr}]`, 'sys');
+                } else { UI.log("💡 当前已无路可走", 'warn'); }
+            }
+        };
+
+        View.init(); setTimeout(() => this.draw(), 50);
+        document.getElementById('log').innerHTML = ''; 
+        UI.log("最终重置：已启用64位引擎，修正所有战术逻辑！", 'sys');
+        this.uiUpdate();
+        
+        const h = e => {
+            if(this.gameOver || this.turn !== 'r' || (this.gameStarted && !this.timers.t)) return;
+            e.preventDefault();
+            const rect = View.cvs.getBoundingClientRect();
+            const x = (e.clientX||e.touches[0].clientX) - rect.left, y = (e.clientY||e.touches[0].clientY) - rect.top;
+            const c = Math.round((x * (View.cvs.width/rect.width) - View.margin)/View.grid);
+            const r = Math.round((y * (View.cvs.height/rect.height) - View.margin)/View.grid);
+            if(c>=0 && c<9 && r>=0 && r<10) this.click(c, r);
+        };
+        View.cvs.onmousedown = h; View.cvs.ontouchstart = h;
+    },
+
+    toKey(map) { return map.flat().join(''); },
+
+    evaluate() {
+        let phaseMat = 0;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = this.map[r][c];
+            if(k) { const t=k.toLowerCase(); if(t==='r'||t==='c'||t==='n') phaseMat++; }
+        }
+        let phase = phaseMat / 12.0; if(phase>1) phase=1;
+        const val_c = Math.floor(350 + 100 * phase);
+        const val_n = Math.floor(450 - 50 * phase);
+
+        let s = 0;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = this.map[r][c];
+            if(!k) continue;
+            const t = k.toLowerCase(), isRed = k<'a';
+            let v = 0;
+            if(t==='c') v = val_c; else if(t==='n') v = val_n; else v = EvalC.vals[t] || 0;
+            if(EvalC.pst[t]) v += EvalC.pst[t][isRed ? 9-r : r][c] || 0;
+            s += isRed ? v : -v; 
+        }
+        return s;
+    },
+
+    getNotation(map, m) {
+        const p = map[m.fr][m.fc];
+        if (!p) return "";
+        const isRed = p < 'a', t = p.toLowerCase();
+        const nRed = {'p':'兵','c':'炮','r':'车','n':'马','b':'相','a':'仕','k':'帅'};
+        const nBlk = {'p':'卒','c':'炮','r':'车','n':'马','b':'象','a':'士','k':'将'};
+        const cRed = ['九','八','七','六','五','四','三','二','一'];
+        const cBlk = ['1','2','3','4','5','6','7','8','9'];
+        const numR = ['一','二','三','四','五','六','七','八','九'];
+        const numB = ['1','2','3','4','5','6','7','8','9'];
+
+        const name = isRed ? nRed[t] : nBlk[t];
+        let startCol = isRed ? cRed[m.fc] : cBlk[m.fc];
+
+        let sameCount = 0, p1R = -1, p2R = -1;
+        for(let r=0; r<10; r++) {
+            if(map[r][m.fc] === p) {
+                sameCount++;
+                if(p1R === -1) p1R = r; else p2R = r;
+            }
+        }
+
+        let prefix = name + startCol;
+        if (sameCount === 2 && (t==='c'||t==='r'||t==='n'||t==='p')) {
+            if(isRed) prefix = (m.fr === p1R ? "前" : "后") + name; 
+            else prefix = (m.fr === p2R ? "前" : "后") + name; 
+        }
+
+        let dir = "";
+        if(m.tr === m.fr) dir = "平";
+        else if(isRed) dir = m.tr < m.fr ? "进" : "退";
+        else dir = m.tr > m.fr ? "进" : "退";
+
+        let end = "";
+        if (dir === "平" || t === 'n' || t === 'b' || t === 'a' || t === 'x' || t === 's' || t === 'm') {
+            end = isRed ? cRed[m.tc] : cBlk[m.tc];
+        } else {
+            const steps = Math.abs(m.tr - m.fr);
+            end = isRed ? numR[steps-1] : numB[steps-1];
+        }
+
+        return prefix + dir + end;
+    },
+
+    hint() {
+        if(this.gameOver || this.turn !== 'r') return;
+        UI.status("思考最佳走法...", true);
+        this.hintMove = null;
+        const d = document.getElementById('depth').value;
+        this.worker.postMessage({ type:'go', map:this.map, depth: parseInt(d), historyKeys: this.historyKeys, isHint: true });
+    },
+
+    draw() { 
+        View.draw(this.map, this.sel, this.last); 
+        if (this.hintMove && !Particles.animating) {
+            const m = View.margin, g = View.grid, hm = this.hintMove;
+            View.ctx.beginPath();
+            View.ctx.moveTo(m + hm.fc * g, m + hm.fr * g); View.ctx.lineTo(m + hm.tc * g, m + hm.tr * g);
+            View.ctx.strokeStyle = '#ff9f0a'; View.ctx.lineWidth = 4; View.ctx.setLineDash([8, 8]); View.ctx.stroke();
+            View.ctx.setLineDash([]); 
+            View.mark(hm.fc, hm.fr, '#ff9f0a'); View.mark(hm.tc, hm.tr, '#ff9f0a');
+        }
+    },
+
+    getMoves(c, r) {
+        const k = this.map[r][c]; if(!k) return [];
+        const type = k.toLowerCase(), isRed = k<'a'; const moves = [];
+        const add = (tc, tr) => {
+            if(tc>=0&&tc<9&&tr>=0&&tr<10) {
+                const t = this.map[tr][tc];
+                if(!t || (isRed?t>'Z':t<'a')) {
+                    const saveT = this.map[tr][tc], saveF = this.map[r][c];
+                    this.map[tr][tc] = saveF; this.map[r][c] = 0;
+                    if(Rules.isLegal(this.map, isRed)) moves.push({tc,tr});
+                    this.map[r][c] = saveF; this.map[tr][tc] = saveT;
+                }
+            }
+        };
+        if(type==='p') {
+            const dir=isRed?-1:1; add(c,r+dir);
+            if(isRed?r<=4:r>=5) { add(c-1,r); add(c+1,r); }
+        } else if(type==='n') {
+            [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]].forEach(([dc,dr])=>{
+                const tc=c+dc, tr=r+dr;
+                if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                     const br = r+(Math.abs(dr)===2?dr/2:0), bc = c+(Math.abs(dc)===2?dc/2:0);
+                     if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) add(tc, tr);
+                }
+            });
+        } else if(type==='r'||type==='c') {
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dc,dr])=>{
+                let nc=c+dc, nr=r+dr, jump=false;
+                while(nc>=0&&nc<9&&nr>=0&&nr<10) {
+                    const t=this.map[nr][nc];
+                    if(type==='r') { if(!t) add(nc,nr); else { add(nc,nr); break; } }
+                    else { if(!t && !jump) add(nc,nr); else if(t && !jump) jump=true; else if(t && jump) { add(nc,nr); break; } }
+                    nc+=dc; nr+=dr;
+                }
+            });
+        } else if(type==='k'||type==='a'||type==='j'||type==='s') {
+             [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
+                if((type==='k'||type==='j')&&dc*dr!==0) return; if((type==='a'||type==='s')&&dc*dr===0) return;
+                const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) add(nc,nr);
+             });
+        } else if(type==='b'||type==='x') {
+            [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(([dc,dr])=>{
+                const tc=c+dc, tr=r+dr;
+                if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                    const br=r+dr/2, bc=c+dc/2;
+                    if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) add(tc,tr); }
+                }
+            });
+        }
+        return moves;
+    },
+
+    click(c, r) {
+        this.hintMove = null; 
+        const k = this.map[r][c];
+        if(k && k<'a') {
+            this.sel = {c, r}; Sound.play('select');
+            const hints = this.getMoves(c, r); View.draw(this.map, this.sel, this.last, hints);
+            return;
+        }
+        if(this.sel) {
+            const valid = this.getMoves(this.sel.c, this.sel.r).find(m=>m.tc===c && m.tr===r);
+            if(valid) {
+                const saveT = this.map[r][c], saveF = this.map[this.sel.r][this.sel.c];
+                this.map[r][c] = saveF; this.map[this.sel.r][this.sel.c] = 0;
+                const repCount = this.historyKeys.filter(key => key === this.toKey(this.map)).length;
+                const isCheck = !Rules.isLegal(this.map, false); 
+                this.map[this.sel.r][this.sel.c] = saveF; this.map[r][c] = saveT; 
+
+                if(repCount >= 2) { 
+                    if(isCheck) {
+                        Sound.play('warn'); alert("规则裁定：长将判负！\n连续将军导致三次重复局面，必须变着。"); return; 
+                    } else {
+                        Sound.play('warn'); this.end("规则裁定：三次重复局面，双方作和！"); return;
+                    }
+                }
+
+                if(!this.gameStarted) this.startGame();
+                
+                this.animateMove({fc:this.sel.c, fr:this.sel.r, tc:c, tr:r}, () => {
+                    setTimeout(()=>this.aiGo(), 50);
+                });
+            }
+        }
+    },
+
+    animateMove(m, callback) {
+        if(this.gameOver) return;
+        const notation = this.getNotation(this.map, m);
+        
+        this.animPiece = this.map[m.fr][m.fc];
+        this.map[m.fr][m.fc] = 0; 
+        this.animM = m;
+        this.animStart = performance.now();
+        
+        const frame = (time) => {
+            let p = (time - this.animStart) / 120; 
+            if(p >= 1) {
+                p = 1;
+                this.map[m.fr][m.fc] = this.animPiece; 
+                this.animPiece = null;
+                this.executeMove(m, notation);
+                if(callback) callback();
+            } else {
+                View.draw(this.map, this.sel, this.last, [], {m: this.animM, p: p, piece: this.animPiece});
+                requestAnimationFrame(frame);
+            }
+        };
+        requestAnimationFrame(frame);
+    },
+
+    executeMove(m, notation) {
+        this.history.push(JSON.parse(JSON.stringify(this.map)));
+        const t = this.map[m.tr][m.tc];
+        this.map[m.tr][m.tc] = this.map[m.fr][m.fc]; this.map[m.fr][m.fc] = 0;
+        
+        this.historyKeys.push(this.toKey(this.map));
+        this.last = m; this.sel = null; 
+        const isRedTurn = this.turn === 'r';
+        this.turn = isRedTurn ? 'b' : 'r';
+        this.timers.step = this.LIMIT_STEP;
+        
+        if(isRedTurn) this.movesCount++;
+        
+        const isCheck = !Rules.isLegal(this.map, !isRedTurn);
+
+        let logMsg = `<span style="opacity:0.6">[第${this.movesCount}回合]</span> ` + (isRedTurn ? "🔴 " : "🟢 ") + notation;
+        if(t) {
+            const names = {'p':'卒','c':'炮','r':'车','n':'马','b':'象','a':'士','k':'将','P':'兵','C':'炮','R':'车','N':'马','B':'相','A':'仕','K':'帅'};
+            logMsg += ` <span class="log-cap">(吃${names[t]||'子'})</span>`;
+            if (!isCheck) Sound.play('capture'); 
+        }
+
+        if(isCheck) {
+            logMsg += ` <span style="color:#ffd60a; font-weight:bold;">(将军!)</span>`;
+            Sound.play('check');
+        } else if (!t) {
+            Sound.play('move');
+        }
+
+        if(t) {
+            const px = View.margin + m.tc * View.grid, py = View.margin + m.tr * View.grid;
+            Particles.add(px, py, t < 'a');
+        } else {
+            this.draw(); 
+        }
+        
+        UI.logHTML(logMsg);
+        this.uiUpdate();
+        if(t && (t==='k'||t==='j')) this.end(this.turn==='b'?"红方胜利!":"黑方胜利!");
+    },
+
+    aiGo() {
+        if(this.gameOver) return;
+        UI.status("AI 思考中...", true);
+        const d = document.getElementById('depth').value;
+        this.worker.postMessage({ type:'go', map:this.map, depth:parseInt(d), historyKeys: this.historyKeys });
+    },
+
+    startGame() {
+        this.gameStarted = true; this.timers.step = this.LIMIT_STEP; 
+        if(this.timers.t) clearInterval(this.timers.t);
+        this.timers.t = setInterval(()=>{
+            if(this.gameOver) return;
+            this.timers.step--; 
+            if(this.turn==='r') this.timers.r--; else this.timers.b--;
+
+            if(this.timers.step <= 0) { this.end(this.turn==='r' ? "红方超时(步时)判负" : "AI超时(步时)判负"); return; }
+            if(this.timers.r <= 0) this.end("红方局时耗尽判负");
+            if(this.timers.b <= 0) this.end("AI局时耗尽判负");
+
+            this.uiUpdate();
+        }, 1000);
+    },
+
+    end(msg) {
+        this.gameOver = true; clearInterval(this.timers.t);
+        Sound.play(msg.includes('获胜')||msg.includes('胜利')?'win':'lose');
+        setTimeout(()=>alert(msg), 100); UI.status(msg, false);
+    },
+
+    undo() {
+        if(this.history.length<2 || this.turn!=='r' || this.gameOver) return;
+        this.history.pop(); this.map = this.history.pop();
+        this.historyKeys.pop(); this.historyKeys.pop(); 
+        this.movesCount--;
+        this.turn = 'r'; this.last = null; this.timers.step = this.LIMIT_STEP; 
+        Sound.play('select'); this.draw(); UI.log("已悔棋", "warn");
+        this.uiUpdate();
+    },
+
+    restart() { clearInterval(this.timers.t); Sound.play('select'); this.init(); },
+
+    uiUpdate() {
+        const fmt = s => `${String(Math.floor(Math.max(0, s)/60)).padStart(2,'0')}:${String(Math.max(0, s)%60).padStart(2,'0')}`;
+        const tr = document.getElementById('timeR'), tb = document.getElementById('timeB');
+        const sr = document.getElementById('stepR'), sb = document.getElementById('stepB');
+
+        if(tr) tr.innerText = fmt(this.timers.r); if(tb) tb.innerText = fmt(this.timers.b);
+        
+        const stepTxt = `剩余 ${this.timers.step}s`, isUrgent = this.timers.step < 15;
+
+        if(sr) { sr.innerText = this.turn==='r' && this.gameStarted ? stepTxt : ''; sr.className = isUrgent && this.turn==='r' ? 'step-timer urgent' : 'step-timer'; }
+        if(sb) { sb.innerText = this.turn==='b' && this.gameStarted ? stepTxt : ''; sb.className = isUrgent && this.turn==='b' ? 'step-timer urgent' : 'step-timer'; }
+        
+        document.getElementById('cellR').classList.toggle('active', this.turn==='r');
+        document.getElementById('cellB').classList.toggle('active', this.turn==='b');
+
+        const score = this.evaluate();
+        let displayScore = score;
+        let text = displayScore > 20 ? `红领先 ${displayScore}` : (displayScore < -20 ? `黑领先 ${-displayScore}` : '势均力敌');
+        let winPct = 50 + (displayScore / 30); 
+        winPct = Math.max(5, Math.min(95, winPct)); 
+        
+        const sbBar = document.getElementById('scoreBar');
+        if(sbBar) sbBar.style.width = winPct + '%';
+        const st = document.getElementById('scoreText');
+        if(st) st.innerText = text;
+    }
+};
+
+const UI = {
+    log(s, type='') {
+        const b = document.getElementById('log');
+        while(b.children.length >= 15) b.removeChild(b.firstElementChild); 
+        const d = document.createElement('div'); 
+        d.className = type ? `log-line ${type}` : 'log-line'; 
+        d.innerText = `> ${s}`;
+        b.appendChild(d); b.scrollTop = b.scrollHeight;
+    },
+    logHTML(htmlStr) {
+        const b = document.getElementById('log');
+        while(b.children.length >= 15) b.removeChild(b.firstElementChild);
+        const d = document.createElement('div'); 
+        d.className = 'log-line'; 
+        d.innerHTML = htmlStr;
+        b.appendChild(d); b.scrollTop = b.scrollHeight;
+    },
+    status(s, busy) {
+        const t = document.getElementById('statusText'), d = document.getElementById('statusDot');
+        if(t) t.innerText = s; if(d) d.className = busy ? "dot thinking" : "dot";
+    }
+};
+
+window.onload = () => Game.init();
+</script>
+</body>
+</html>
