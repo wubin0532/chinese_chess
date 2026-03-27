@@ -64,3 +64,22 @@
    docker run -d -p 8080:80 \
      -v /volume1/docker/chess:/usr/share/nginx/html:ro \
      --name chinese-chess nginx
+访问 http://<你的NAS_IP>:8080 即可跨设备畅玩！
+
+💡 踩坑提示： 如果部署后访问提示 403 Forbidden，请检查：
+
+文件名必须是 index.html。
+
+挂载的本地文件夹权限是否已开放（Nginx 容器内的用户需要读取权限）。
+
+📅 版本历史 (Changelog)
+V10.0 (典藏神擎版)：彻底隔离 UI 与 Worker 线程，修复极限算力下的内存泄漏与 undefined 崩溃；加入绝杀判定引擎与 Cubic 缓出动画。
+
+V9.0：重构 UI 渲染模块，修复画布坐标文字被边缘截断的问题，优化繁简字体绝对居中，增加木纹物理光影。
+
+V8.0：升级评价函数，加入开局库，强化兵型与车马战术动态加分。
+
+V1.0：基础 Alpha-Beta 引擎与 Canvas 绘制。
+
+📄 许可证 (License)
+本项目采用 MIT License 开源，欢迎自由 Fork、魔改或将其集成到你的项目中。如果你喜欢这个项目，欢迎点个 ⭐️ Star！
