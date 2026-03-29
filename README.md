@@ -49,10 +49,6 @@
 
 # ♟️ 中国象棋 Pro17 (Chinese Chess Pro17)
 
-![Version](https://img.shields.io/badge/Version-V17_Ultimate-success?style=for-the-badge)
-![Tech Stack](https://img.shields.io/badge/Tech-HTML5%20%7C%20Canvas%20%7C%20Web_Workers-blue?style=for-the-badge)
-![Concurrency](https://img.shields.io/badge/Concurrency-Lazy_SMP_SharedArrayBuffer-orange?style=for-the-badge)
-
 一个基于纯前端（HTML/JS/CSS）的极限性能中国象棋 AI 引擎。
 本项目挑战了浏览器环境下的性能物理极限，通过结合 **Zobrist 哈希、置换表 (TT)、Web Workers 集群** 以及硬核的 **Nginx 跨域隔离 + SharedArrayBuffer 共享内存**，在网页端实现了国家大师级开局库与极速的多核 Lazy SMP 并发推演。
 
