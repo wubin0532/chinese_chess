@@ -1,4 +1,4 @@
-# ♟️ 中国象棋 Pro17 - 典藏神擎版 (V10)
+# ♟️ 中国象棋 Pro17 - 典藏神擎版 (V17)
 
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?style=flat-square&logo=html5&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JS-Vanilla-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
