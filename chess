@@ -3,121 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>中国象棋 Pro17 - 最终无暇版</title>
+    <title>中国象棋 Pro17 - V17 终极引擎 (已修复)</title>
     <style>
-        :root { --bg: #212121; --panel: #2c2c2e; --text: #e0e0e0; --accent: #0a84ff; --red: #ff453a; --black: #30d158; --border: rgba(255,255,255,0.15); }
-        body { margin: 0; background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-font-smoothing: antialiased; }
-        .header { height: 44px; background: rgba(44, 44, 46, 0.95); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 14px; font-weight: 600; flex-shrink: 0; }
-        .main-layout { flex: 1; display: flex; padding: 20px; gap: 20px; height: calc(100% - 44px); box-sizing: border-box; align-items: center; justify-content: center; }
-        .board-wrap { height: 100%; width: auto; aspect-ratio: 9/10; background: #2b2b2b; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; border: 1px solid var(--border); position: relative; max-width: 100%; }
-        canvas { border-radius: 4px; width: 100%; height: 100%; display: block; }
-        .sidebar { width: 280px; height: 100%; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
-        .panel { background: var(--panel); border-radius: 10px; padding: 15px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .status-row { display: flex; align-items: center; margin-bottom: 12px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; margin-right: 8px; transition: 0.3s; }
-        .dot.thinking { background: #ffd60a; box-shadow: 0 0 8px #ffd60a; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        /* ================= CSS 核心全局变量与布局 ================= */
+        :root { --bg: #18181a; --panel: #222225; --text: #e0e0e0; --accent: #0a84ff; --red: #ff453a; --black: #30d158; --border: rgba(255,255,255,0.08); }
+        body { margin: 0; background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-font-smoothing: antialiased; touch-action: none; }
         
-        .timer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        .t-cell { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid transparent; transition: 0.3s; position: relative; overflow: hidden; }
-        .t-cell.active { background: rgba(255,255,255,0.08); border-color: var(--accent); }
-        .t-val { display: block; font-family: "SF Mono", monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; }
-        .t-lbl { font-size: 10px; opacity: 0.6; margin-top: 2px; }
-        .step-timer { margin-top: 4px; font-size: 12px; color: #ffd60a; font-family: "SF Mono", monospace; height: 16px; transition: color 0.3s; }
-        .step-timer.urgent { color: #ff453a; font-weight: bold; animation: urgent-pulse 0.5s infinite alternate; }
-        @keyframes urgent-pulse { from { opacity: 1; } to { opacity: 0.6; } }
+        .header { height: 50px; background: rgba(30, 30, 32, 0.95); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 16px; font-weight: 700; flex-shrink: 0; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 10; backdrop-filter: blur(10px); }
+        .header-subtitle { font-size: 11px; opacity: 0.5; font-weight: normal; font-family: "SF Mono", Consolas, monospace; letter-spacing: 1px; }
 
-        .score-wrap { margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
-        .score-labels { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 6px; }
-        .score-bar-bg { height: 6px; background: var(--black); border-radius: 3px; overflow: hidden; display: flex; }
-        .score-bar-fill { height: 100%; background: var(--red); width: 50%; transition: width 0.5s ease-in-out; }
-
-        label { font-size: 11px; color: #aaa; display: block; margin-bottom: 6px; }
-        select { width: 100%; background: #3a3a3c; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 6px; font-size: 12px; outline: none; }
+        .main-layout { flex: 1; display: flex; padding: 24px; gap: 24px; height: calc(100% - 50px); box-sizing: border-box; align-items: center; justify-content: center; }
         
-        .log-box { flex: 1; min-height: 0; background: #151515; border-radius: 6px; padding: 10px; font-family: "SF Mono", monospace; font-size: 11px; color: #a1c9f7; overflow-y: auto; border: 1px solid #333; scroll-behavior: smooth; }
-        .log-line { margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
-        .log-line.warn { color: #ffab00; }
-        .log-line.sys { color: #30d158; opacity: 0.8; }
+        .board-wrap { height: 100%; width: auto; aspect-ratio: 10.4/11.4; background: #262626; border-radius: 16px; box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; border: 1px solid rgba(255,255,255,0.05); position: relative; max-width: 100%; transition: background 0.4s ease; overflow: hidden; }
+        canvas { border-radius: 12px; width: 100%; height: 100%; display: block; touch-action: none; }
+        
+        .sidebar { width: 320px; height: 100%; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+        .panel { background: linear-gradient(145deg, #262629, #1f1f21); border-radius: 14px; padding: 18px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; display: flex; flex-direction: column; }
+        .panel-title { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+
+        .status-badge { display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; margin-right: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        .dot.thinking { background: #ffd60a; box-shadow: 0 0 10px #ffd60a, inset 0 1px 2px rgba(255,255,255,0.8); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+        
+        .timer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .t-cell { background: rgba(0,0,0,0.4); padding: 14px 8px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.03); transition: 0.3s; position: relative; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); }
+        .t-cell.active { background: rgba(255,255,255,0.06); border-color: var(--accent); box-shadow: 0 0 20px rgba(10, 132, 255, 0.15), inset 0 2px 8px rgba(0,0,0,0.5); }
+        .t-val { display: block; font-family: "SF Mono", Consolas, monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
+        .t-lbl { font-size: 11px; color: #888; margin-top: 6px; letter-spacing: 0.5px; }
+        .step-timer { margin-top: 6px; font-size: 12px; color: #ffd60a; font-family: "SF Mono", Consolas, monospace; height: 14px; transition: color 0.3s; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .step-timer.urgent { color: #ff453a; font-weight: bold; animation: urgent-pulse 0.5s infinite alternate; text-shadow: 0 0 10px rgba(255,69,58,0.6); }
+
+        .score-wrap { background: rgba(0,0,0,0.4); padding: 14px; border-radius: 10px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.03); }
+        .score-labels { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 10px; font-weight: 600; color: #aaa; }
+        .score-bar-bg { height: 8px; background: var(--black); border-radius: 4px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); }
+        .score-bar-fill { height: 100%; background: var(--red); width: 50%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 2px 0 5px rgba(0,0,0,0.5); }
+
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .setting-item { display: flex; flex-direction: column; gap: 6px; }
+        .settings-grid label { font-size: 11px; color: #888; font-weight: 600; }
+        select { width: 100%; background: linear-gradient(180deg, #2a2a2c 0%, #1e1e20 100%); color: #ddd; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        select:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+        
+        .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); margin: 0 0 16px 0; }
+
+        .btn-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-row:last-child { margin-bottom: 0; }
+        button { flex: 1; padding: 12px 0; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3), inset 0 1px 1px rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; gap: 6px; letter-spacing: 0.5px; }
+        button:hover { filter: brightness(1.15); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(10, 132, 255, 0.4), inset 0 1px 1px rgba(255,255,255,0.2); }
+        button:active { transform: scale(0.96) translateY(1px); box-shadow: 0 2px 5px rgba(10, 132, 255, 0.4); }
+        
+        button.sec { background: linear-gradient(180deg, #333336 0%, #262629 100%); border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 10px rgba(0,0,0,0.3); color: #ccc; }
+        button.sec:hover { color: #fff; border-color: rgba(255,255,255,0.15); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+        button.sec.active-toggle { background: linear-gradient(135deg, #1e8449, #155730); color: #fff; border-color: #30d158; box-shadow: 0 4px 12px rgba(48, 209, 88, 0.3); }
+
+        button.highlight { background: linear-gradient(135deg, #ff9f0a 0%, #ff453a 100%); box-shadow: 0 4px 12px rgba(255, 69, 58, 0.3), inset 0 1px 1px rgba(255,255,255,0.3); text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        button.highlight:hover { box-shadow: 0 6px 18px rgba(255, 69, 58, 0.5); }
+
+        .log-panel { flex: 1; display: flex; flex-direction: column; min-height: 120px; }
+        .log-box { flex: 1; background: rgba(10, 12, 15, 0.6); border-radius: 10px; padding: 12px; font-family: "SF Mono", Consolas, monospace; font-size: 12px; color: #a1c9f7; overflow-y: auto; border: 1px solid rgba(10, 132, 255, 0.15); box-shadow: inset 0 5px 15px rgba(0,0,0,0.8); scroll-behavior: smooth; }
+        .log-box::-webkit-scrollbar { width: 5px; }
+        .log-box::-webkit-scrollbar-thumb { background: rgba(10, 132, 255, 0.3); border-radius: 3px; }
+        .log-line { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed rgba(255,255,255,0.05); white-space: pre-wrap; word-break: break-all; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .log-line:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .log-line.warn { color: #ff9f0a; }
+        .log-line.sys { color: #30d158; opacity: 0.9; }
         .log-cap { color: #ff453a; font-weight: bold; } 
-        
-        .btn-row { display: flex; gap: 10px; margin-top: 12px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; transition: 0.2s; }
-        button:active { transform: scale(0.96); }
-        button.sec { background: #3a3a3c; }
-        @media (max-width: 800px) { .main-layout { flex-direction: column; padding: 10px; } .board-wrap { width: 100%; flex: 1; max-height: 60vh; } .sidebar { width: 100%; height: auto; flex: none; } .log-box { min-height: 80px; max-height: 120px; } }
+
+        #editOverlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(20,20,22,0.96); z-index: 10; border-radius: 16px; padding: 24px; display: none; flex-direction: column; backdrop-filter: blur(8px); }
+        .edit-title { color: #fff; font-size: 16px; font-weight: 700; margin-bottom: 20px; text-align: center; letter-spacing: 2px; }
+        .palette { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 24px; }
+        .p-piece { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(145deg, #e6e6e6, #b0b0b0); display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 22px; cursor: pointer; border: 2px solid transparent; box-shadow: 0 5px 10px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.2); transition: all 0.2s; }
+        .p-piece:hover { transform: translateY(-2px) scale(1.05); }
+        .p-piece.red { color: #c00; font-family: "STKaiti", "Kaiti SC", "Kaiti", serif; }
+        .p-piece.blk { color: #1e8449; font-family: "STKaiti", "Kaiti SC", "Kaiti", serif; }
+        .p-piece.sel { border-color: var(--accent); transform: scale(1.15) translateY(-2px); box-shadow: 0 0 20px rgba(10,132,255,0.6); }
+        .p-clear { width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(145deg, #ff5a50, #d03020); display: flex; justify-content: center; align-items: center; font-size: 13px; font-weight: bold; color: #fff; cursor: pointer; border: 2px solid transparent; box-shadow: 0 5px 10px rgba(0,0,0,0.5); transition: all 0.2s; }
+        .p-clear.sel { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 20px rgba(255,69,58,0.6); }
+
+        @media (max-width: 900px) { .main-layout { flex-direction: column; padding: 12px; gap: 16px; } .board-wrap { width: 100%; flex: 1; max-height: 55vh; border-radius: 12px; } .sidebar { width: 100%; height: auto; flex: none; gap: 12px; } .log-panel { min-height: 90px; max-height: 120px; } .settings-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
+        @media (max-width: 600px) { .settings-grid { grid-template-columns: 1fr 1fr; } }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <span>CHINESE CHESS <span style="color:var(--accent)">PRO</span></span>
-    <span style="font-size:11px; opacity:0.7">64位防碰撞引擎 + 剪枝逻辑修复版</span>
+    <span>CHINESE CHESS <span style="color:var(--accent)">PRO V16</span></span>
+    <span class="header-subtitle">终极版 · 真无锁并发与光速首步</span>
 </div>
 
 <div class="main-layout">
     <div class="board-wrap" id="boardContainer">
         <canvas id="board"></canvas>
     </div>
-
+    
     <div class="sidebar">
         <div class="panel">
-            <div class="status-row">
-                <span class="dot" id="statusDot"></span>
-                <span id="statusText" style="font-size:13px; font-weight:bold;">等待开局</span>
+            <div class="panel-title">
+                <span>TACTICAL STATUS</span>
+                <div class="status-badge">
+                    <span class="dot" id="statusDot"></span>
+                    <span id="statusText" style="font-size:12px; font-weight:bold; color:#ddd;">等待开局</span>
+                </div>
             </div>
             
             <div class="timer-grid">
                 <div class="t-cell" id="cellR">
                     <span class="t-val" style="color:var(--red)" id="timeR">20:00</span>
-                    <span class="t-lbl">红方(局时)</span>
+                    <span class="t-lbl">红方局时</span>
                     <div class="step-timer" id="stepR"></div>
                 </div>
                 <div class="t-cell" id="cellB">
                     <span class="t-val" style="color:var(--black)" id="timeB">20:00</span>
-                    <span class="t-lbl">黑方(局时)</span>
+                    <span class="t-lbl">黑方局时</span>
                     <div class="step-timer" id="stepB"></div>
                 </div>
             </div>
 
             <div class="score-wrap">
                 <div class="score-labels">
-                    <span>红方</span><span id="scoreText" style="color:#fff; font-weight:bold;">势均力敌</span><span>黑方</span>
+                    <span>🔴 RED</span>
+                    <span id="scoreText" style="color:#fff; font-size:13px; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">势均力敌</span>
+                    <span>BLK 🟢</span>
                 </div>
                 <div class="score-bar-bg">
                     <div class="score-bar-fill" id="scoreBar"></div>
                 </div>
             </div>
-
-            <label>AI 算力深度</label>
-            <select id="depth">
-                <option value="3">快速 (L1)</option>
-                <option value="4" selected>标准 (L2)</option>
-                <option value="5">强力 (L3)</option>
-            </select>
-
-            <label style="margin-top: 12px;">开局让子 (黑方让子)</label>
-            <select id="handicap" onchange="Game.restart()">
-                <option value="0" selected>公平对决 (无让子)</option>
-                <option value="1">让左马 (黑方让一马)</option>
-                <option value="2">让双马 (黑方让双马)</option>
-                <option value="3">让双车 (黑方让双车)</option>
-            </select>
         </div>
 
-        <div class="panel" style="flex:1; display:flex; flex-direction:column; min-height:0;">
-            <div class="log-box" id="log"></div>
-            <div class="btn-row">
-                <button onclick="Game.restart()">重新开始</button>
-                <button class="sec" onclick="Game.undo()">悔棋</button>
-                <button class="sec" style="background:#ff9f0a; color:#fff;" onclick="Game.hint()">💡提示</button>
+        <div class="panel" style="padding-bottom: 14px;">
+            <div class="panel-title"><span>COMMAND CENTER</span></div>
+            
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label>对战模式</label>
+                    <select id="gameMode" onchange="Game.changeMode()">
+                        <option value="h-ai" selected>单机 (AI执黑)</option>
+                        <option value="h-h">双人 (同屏对弈)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>棋盘皮肤</label>
+                    <select id="themeSelect" onchange="View.setTheme(this.value)">
+                        <option value="classic">极客原色</option>
+                        <option value="wood" selected>紫檀木纹</option>
+                        <option value="green">清新石绿</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>AI 算力</label>
+                    <select id="depth">
+                        <option value="3">L1 (极速)</option>
+                        <option value="4">L2 (标准)</option>
+                        <option value="5">L3 (强力)</option>
+                        <option value="6" selected>L4 (LazySMP 极限)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>让子模式</label>
+                    <select id="handicap" onchange="Game.restart()">
+                        <option value="0" selected>公平对决</option>
+                        <option value="1">让左马</option>
+                        <option value="2">让双马</option>
+                        <option value="3">让双车</option>
+                    </select>
+                </div>
             </div>
+            
+            <div class="divider"></div>
+            
+            <div class="btn-row">
+                <button class="sec" onclick="Game.restart()">🔄 重置</button>
+                <button class="sec" onclick="Game.undo()">↩️ 悔棋</button>
+                <button class="highlight" onclick="Game.hint()">💡 神经预测</button>
+            </div>
+            <div class="btn-row">
+                <button class="sec" onclick="Game.toggleEdit()">⚙️ 阵型编辑</button>
+                <button class="sec" onclick="Game.flipBoard()">🔃 翻转</button>
+                <button class="sec" id="soundBtn" onclick="Game.toggleSound()">🔊 音效</button>
+                <button class="sec" id="autoBtn" onclick="Game.toggleAuto()">▶️ 托管</button>
+            </div>
+
+            <div id="editOverlay">
+                <div class="edit-title">CREATIVE MODE</div>
+                <div class="palette" id="paletteBox">
+                    <div class="p-piece red sel" onclick="Game.selEdit('K', this)">帅</div>
+                    <div class="p-piece red" onclick="Game.selEdit('A', this)">仕</div>
+                    <div class="p-piece red" onclick="Game.selEdit('B', this)">相</div>
+                    <div class="p-piece red" onclick="Game.selEdit('N', this)">马</div>
+                    <div class="p-piece red" onclick="Game.selEdit('R', this)">车</div>
+                    <div class="p-piece red" onclick="Game.selEdit('C', this)">炮</div>
+                    <div class="p-piece red" onclick="Game.selEdit('P', this)">兵</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('k', this)">將</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('a', this)">士</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('b', this)">象</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('n', this)">馬</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('r', this)">車</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('c', this)">砲</div>
+                    <div class="p-piece blk" onclick="Game.selEdit('p', this)">卒</div>
+                    <div class="p-clear" onclick="Game.selEdit('clear', this)">擦</div>
+                </div>
+                <button style="background:#30d158; margin-bottom: 12px; font-size:14px;" onclick="Game.finishEdit()">✅ 完成配置并开局</button>
+                <button class="sec" onclick="Game.clearBoard()">🗑️ 清空所有棋子</button>
+            </div>
+        </div>
+
+        <div class="panel log-panel">
+            <div class="panel-title" style="margin-bottom:8px;"><span>SYSTEM LOG</span></div>
+            <div class="log-box" id="log"></div>
         </div>
     </div>
 </div>
 
 <script id="worker-code" type="javascript/worker">
-    // --- Worker: 核心算法与规则检查 ---
     const Rules = {
         isLegal(map, myColorIsRed) {
             let rK = null, bK = null;
@@ -128,8 +227,10 @@
             if(!rK || !bK) return true; 
             if(rK.c === bK.c) {
                 let count = 0;
-                for(let r = bK.r + 1; r < rK.r; r++) { if(map[r][rK.c]) count++; }
-                if(count === 0) return false;
+                const minR = Math.min(rK.r, bK.r);
+                const maxR = Math.max(rK.r, bK.r);
+                for(let r = minR + 1; r < maxR; r++) { if(map[r][rK.c]) count++; }
+                if(count === 0) return false; 
             }
             const myKing = myColorIsRed ? rK : bK;
             const enemyColorLower = myColorIsRed;
@@ -149,7 +250,7 @@
                                 }
                             } else { if(type === 'c') return false; }
                         }
-                        if(p) { if(jump) break; jump = true; }
+                        if(p) { if(jump) break; jump = true; } 
                     }
                     c += d[0]; r += d[1];
                 }
@@ -162,9 +263,9 @@
                     if(p) {
                         const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
                         if(isEnemy && p.toLowerCase() === 'n') {
-                            const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : k[0]);
-                            const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : k[1]);
-                            if(!map[legR][legC]) return false;
+                            const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : 0);
+                            const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : 0);
+                            if(legR>=0 && legR<10 && legC>=0 && legC<9) { if(!map[legR][legC]) return false; }
                         }
                     }
                 }
@@ -185,15 +286,20 @@
     };
     C.pst.m = C.pst.n; C.pst.x = C.pst.r;
 
-    // 【新增：64位 BigInt 哈希，彻底消灭 TT 碰撞幻觉】
     const Zobrist = {
         table: new BigInt64Array(14 * 10 * 9),
         key: 0n,
-        pieceMap: { 'k':0, 'a':1, 'b':2, 'n':3, 'r':4, 'c':5, 'p':6, 'K':7, 'A':8, 'B':9, 'N':10, 'R':11, 'C':12, 'P':13, 'j':0, 's':1, 'x':2, 'm':3 },
+        pieceMap: { 'k':0, 'a':1, 'b':2, 'n':3, 'r':4, 'c':5, 'p':6, 'K':7, 'A':8, 'B':9, 'N':10, 'R':11, 'C':12, 'P':13 },
         init() { 
+            // 🟢 V16 修复：使用固定种子的伪随机数，防止雪崩与缓存毒化
+            let seed = 20260329; 
+            const seededRandom = () => {
+                seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+                return (seed >>> 0) / 4294967296;
+            };
             for(let i=0; i<this.table.length; i++) {
-                const h = BigInt(Math.floor(Math.random() * 0xFFFFFFFF));
-                const l = BigInt(Math.floor(Math.random() * 0xFFFFFFFF));
+                const h = BigInt(Math.floor(seededRandom() * 0xFFFFFFFF));
+                const l = BigInt(Math.floor(seededRandom() * 0xFFFFFFFF));
                 this.table[i] = (h << 32n) | l;
             }
         },
@@ -209,27 +315,77 @@
     };
     Zobrist.init();
 
-    const TT = {
-        map: new Map(), MAX_SIZE: 500000,
+    const SHARED_TT_SIZE = 8388608;  
+    const LOCAL_TT_SIZE = 1048576;   
+
+    let TT = {
+        isInitialized: false,
+        isShared: false,
+        init(buffer) {
+            this.isInitialized = true;
+            if (buffer) {
+                this.isShared = true;
+                this.keys = new BigInt64Array(buffer, 0, SHARED_TT_SIZE);
+                this.vals = new Int16Array(buffer, 8 * SHARED_TT_SIZE, SHARED_TT_SIZE);
+                this.depths = new Int8Array(buffer, 10 * SHARED_TT_SIZE, SHARED_TT_SIZE);
+                this.flags = new Uint8Array(buffer, 11 * SHARED_TT_SIZE, SHARED_TT_SIZE);
+                this.isMaxs = new Uint8Array(buffer, 12 * SHARED_TT_SIZE, SHARED_TT_SIZE);
+            } else {
+                this.isShared = false;
+                this.table = new Array(LOCAL_TT_SIZE);
+            }
+        },
         store(key, depth, val, flag, isMax) {
-            if(this.map.size > this.MAX_SIZE) this.map.clear();
-            this.map.set(key, { d: depth, v: val, f: flag, m: isMax });
+            if (this.isShared) {
+                const idx = Number(key & BigInt(SHARED_TT_SIZE - 1));
+                if (this.keys[idx] !== key || depth >= this.depths[idx]) {
+                    this.keys[idx] = key;
+                    this.vals[idx] = val;
+                    this.depths[idx] = depth;
+                    this.flags[idx] = flag;
+                    this.isMaxs[idx] = isMax ? 1 : 0;
+                }
+            } else {
+                const idx = Number(key & BigInt(LOCAL_TT_SIZE - 1));
+                const entry = this.table[idx];
+                if (!entry || entry.key !== key || depth >= entry.d) {
+                    this.table[idx] = { key, d: depth, v: val, f: flag, m: isMax };
+                }
+            }
         },
         probe(key, depth, alpha, beta, isMax) {
-            const entry = this.map.get(key);
-            if(entry && entry.d >= depth && entry.m === isMax) {
-                if(entry.f === 0) return entry.v; 
-                if(entry.f === 1 && entry.v <= alpha) return entry.v; 
-                if(entry.f === 2 && entry.v >= beta) return entry.v; 
+            if (this.isShared) {
+                const idx = Number(key & BigInt(SHARED_TT_SIZE - 1));
+                if (this.keys[idx] === key && this.depths[idx] >= depth && this.isMaxs[idx] === (isMax ? 1 : 0)) {
+                    const f = this.flags[idx];
+                    const v = this.vals[idx];
+                    if (f === 0) return v;
+                    if (f === 1 && v <= alpha) return v;
+                    if (f === 2 && v >= beta) return v;
+                }
+                return null;
+            } else {
+                const idx = Number(key & BigInt(LOCAL_TT_SIZE - 1));
+                const entry = this.table[idx];
+                if(entry && entry.key === key && entry.d >= depth && entry.m === isMax) {
+                    if(entry.f === 0) return entry.v; 
+                    if(entry.f === 1 && entry.v <= alpha) return entry.v; 
+                    if(entry.f === 2 && entry.v >= beta) return entry.v; 
+                }
+                return null;
             }
-            return null;
+        },
+        clear() {
+            if (!this.isShared) {
+                this.table = new Array(LOCAL_TT_SIZE);
+            }
         }
     };
 
     const Engine = {
-        historyTable: null, killers: null, path: new BigInt64Array(100), 
+        historyTable: null, killers: null, path: new BigInt64Array(1000), 
         val_c: 450, val_n: 400,
-        
+
         eval(map) {
             let s = 0;
             let rKing = null, bKing = null;
@@ -240,31 +396,19 @@
                     const k = map[r][c];
                     if(!k) continue;
                     const t = k.toLowerCase(), isRed = k<'a';
-                    
                     let v = 0;
-                    if(t==='c') v = this.val_c;
-                    else if(t==='n') v = this.val_n;
-                    else v = C.vals[t] || 0;
+                    if(t==='c') v = this.val_c; else if(t==='n') v = this.val_n; else v = C.vals[t] || 0;
+                    if(C.pst[t]) { const row = C.pst[t][isRed ? 9-r : r]; if(row) v += row[c] || 0; }
+                    s += isRed ? v : -v; 
 
-                    if(C.pst[t]) v += C.pst[t][isRed ? 9-r : r][c] || 0;
-                    
-                    // 【核心修复：绝对分数体系】红正黑负
-                    s += isRed ? v : -v;
-
-                    if (k === 'K') rKing = {r, c};
-                    else if (k === 'k') bKing = {r, c};
-                    else if (k === 'A' || k === 'S') rA++;
-                    else if (k === 'B' || k === 'X') rE++;
-                    else if (k === 'a' || k === 's') bA++;
-                    else if (k === 'b' || k === 'x') bE++;
+                    if (k === 'K') rKing = {r, c}; else if (k === 'k') bKing = {r, c};
+                    else if (k === 'A' || k === 'S') rA++; else if (k === 'B' || k === 'X') rE++;
+                    else if (k === 'a' || k === 's') bA++; else if (k === 'b' || k === 'x') bE++;
                 }
             }
 
-            // 【核心修复：防守缺失惩罚正确倒置】
-            if (rA < 2) s -= (2 - rA) * 60; // 红缺士，扣红分(利黑)
-            if (rE < 2) s -= (2 - rE) * 50; 
-            if (bA < 2) s += (2 - bA) * 60; // 黑缺士，加红分(利红)
-            if (bE < 2) s += (2 - bE) * 50; 
+            if (rA < 2) s -= (2 - rA) * 60; if (rE < 2) s -= (2 - rE) * 50; 
+            if (bA < 2) s += (2 - bA) * 60; if (bE < 2) s += (2 - bE) * 50; 
 
             for(let r=0; r<10; r++) {
                 for(let c=0; c<9; c++) {
@@ -273,8 +417,7 @@
                     const isRed = k<'a';
                     const t = k.toLowerCase();
 
-                    let mobility = 0;
-                    let threat = 0;
+                    let mobility = 0, threat = 0;
 
                     if (t === 'r') {
                         let count = 0;
@@ -282,12 +425,19 @@
                         for(let i=0; i<4; i++) {
                             let nc = c + dirs[i][0], nr = r + dirs[i][1];
                             while(nc>=0 && nc<9 && nr>=0 && nr<10) {
-                                if(!map[nr][nc]) count++; else break;
+                                if(!map[nr] || !map[nr][nc]) count++; else break;
                                 nc += dirs[i][0]; nr += dirs[i][1];
                             }
                         }
                         mobility = count * 2; 
                         
+                        const rDir = isRed ? 1 : -1;
+                        let isOpen = true;
+                        for(let nr = r + rDir; nr >= 0 && nr < 10; nr += rDir) {
+                            const p = map[nr] && map[nr][c];
+                            if(p) { if(p.toLowerCase() === 'p' && (p < 'a') === isRed) isOpen = false; break; }
+                        }
+                        if(isOpen) mobility += 25;
                         if (isRed && bKing && c === bKing.c) threat += 30;
                         if (!isRed && rKing && c === rKing.c) threat += 30;
 
@@ -297,31 +447,25 @@
                         for(let i=0; i<4; i++) {
                             let nc = c + dirs[i][0], nr = r + dirs[i][1];
                             while(nc>=0 && nc<9 && nr>=0 && nr<10) {
-                                if(!map[nr][nc]) count++; else break;
+                                if(!map[nr] || !map[nr][nc]) count++; else break;
                                 nc += dirs[i][0]; nr += dirs[i][1];
                             }
                         }
                         mobility = count * 1; 
 
                         if (isRed && bKing && c === bKing.c) {
-                            let piecesBetween = 0;
-                            for(let i=Math.min(r, bKing.r)+1; i<Math.max(r, bKing.r); i++) {
-                                if(map[i][c]) piecesBetween++;
-                            }
-                            if (piecesBetween === 0) threat += 150; 
-                            else if (piecesBetween === 1 && r > 4) threat += 40; 
+                            let pb = 0;
+                            for(let i=Math.min(r, bKing.r)+1; i<Math.max(r, bKing.r); i++) if(map[i] && map[i][c]) pb++;
+                            if (pb === 0) threat += 20; else if (pb === 1) threat += 60; else if (pb === 2) threat += 30; 
                         }
                         if (!isRed && rKing && c === rKing.c) {
-                            let piecesBetween = 0;
-                            for(let i=Math.min(r, rKing.r)+1; i<Math.max(r, rKing.r); i++) {
-                                if(map[i][c]) piecesBetween++;
-                            }
-                            if (piecesBetween === 0) threat += 150; 
-                            else if (piecesBetween === 1 && r < 5) threat += 40; 
+                            let pb = 0;
+                            for(let i=Math.min(r, rKing.r)+1; i<Math.max(r, rKing.r); i++) if(map[i] && map[i][c]) pb++;
+                            if (pb === 0) threat += 20; else if (pb === 1) threat += 60; else if (pb === 2) threat += 30; 
                         }
 
                     } else if (t === 'n') {
-                        let count = 0;
+                        let count = 0, blocked = 0;
                         const moves = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
                         for(let i=0; i<8; i++) {
                             const d = moves[i];
@@ -329,20 +473,35 @@
                             if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
                                 const legC = c + (Math.abs(d[0])===2 ? d[0]/2 : 0);
                                 const legR = r + (Math.abs(d[1])===2 ? d[1]/2 : 0);
-                                if(!map[legR][legC]) count++;
+                                if(map[legR]) { if(!map[legR][legC]) count++; else blocked++; }
                             }
                         }
-                        mobility = count * 3; 
-                        // 鼓励马占中
+                        mobility = (count * 3) - (blocked * 15); 
                         if (c >= 2 && c <= 6) mobility += 15;
+                        
+                    } else if (t === 'p') {
+                        if (c > 0 && map[r][c-1] === k) mobility += 15;
+                        if (c < 8 && map[r][c+1] === k) mobility += 15;
+                        const eKing = isRed ? bKing : rKing;
+                        if (eKing && ((isRed && r < 5) || (!isRed && r > 4))) { 
+                            let dist = Math.abs(c - eKing.c) + Math.abs(r - eKing.r);
+                            if (dist <= 3) threat += 40; if (dist <= 2) threat += 60;
+                        }
+                        const crossed = (isRed && r <= 4) || (!isRed && r >= 5);
+                        if(crossed) { mobility += 30; if(c >= 3 && c <= 5) mobility += 15; }
+                        const pDir = isRed ? -1 : 1; let isPassed = true;
+                        for(let nr = r + pDir; nr >= 0 && nr < 10; nr += pDir) {
+                            const p = map[nr] && map[nr][c];
+                            if(p) { if(p.toLowerCase() === 'p') isPassed = false; break; }
+                        }
+                        if(isPassed && crossed) mobility += 20;
                     }
-
-                    // 【核心修复：绝对分数体系】红正黑负
                     s += isRed ? (mobility + threat) : -(mobility + threat);
                 }
             }
             return s;
         },
+
         genMoves(map, isRed, onlyCaptures=false, ply=-1) {
             const moves = [];
             for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
@@ -371,8 +530,9 @@
                         }
                         if (sortScore === 0) {
                             let hist = Engine.historyTable ? Engine.historyTable[(r*9+c)*90 + (tr*9+tc)] : 0;
-                            if (hist > 70000) hist = 70000; // 防止历史表膨胀掩盖吃子得分
-                            sortScore = hist + (C.pst[t] ? (C.pst[t][isRed ? 9-tr : tr][tc] || 0) : 0);
+                            if (hist > 70000) hist = 70000; 
+                            if(C.pst[t]) { const row = C.pst[t][isRed ? 9-tr : tr]; sortScore = hist + (row ? row[tc] || 0 : 0); } 
+                            else { sortScore = hist; }
                         }
                     }
                     moves.push({fc: c, fr: r, tc, tr, val: sortScore, isCapture: isCapture});
@@ -384,11 +544,7 @@
                         while(nc>=0 && nc<9 && nr>=0 && nr<10) {
                             const tg = map[nr][nc];
                             if(t==='r') { if(!tg) addMove(nc,nr); else { addMove(nc,nr); break; } }
-                            else {
-                                if(!tg && !jump) addMove(nc,nr);
-                                else if(tg && !jump) jump=true;
-                                else if(tg && jump) { addMove(nc,nr); break; }
-                            }
+                            else { if(!tg && !jump) addMove(nc,nr); else if(tg && !jump) jump=true; else if(tg && jump) { addMove(nc,nr); break; } }
                             nc+=dc; nr+=dr;
                         }
                     });
@@ -396,26 +552,24 @@
                     [[-1,-2],[-1,2],[1,-2],[1,2],[-2,-1],[-2,1],[2,-1],[2,1]].forEach(([dc,dr])=>{
                         const tc=c+dc, tr=r+dr;
                         if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
-                            if(!map[r+(Math.abs(dr)===2?dr/2:0)][c+(Math.abs(dc)===2?dc/2:0)]) addMove(tc, tr);
+                            const legC = c + (Math.abs(dc)===2 ? dc/2 : 0);
+                            const legR = r + (Math.abs(dr)===2 ? dr/2 : 0);
+                            if(legR>=0 && legR<10 && legC>=0 && legC<9) { if(!map[legR][legC]) addMove(tc, tr); }
                         }
                     });
                 } else if(t==='p') {
                     addMove(c, r + (isRed ? -1 : 1));
                     if(isRed ? r<=4 : r>=5) { addMove(c-1,r); addMove(c+1,r); }
-                } else if(t==='k' || t==='a' || t==='j' || t==='s') {
+                } else if(t==='k' || t==='j' || t==='a' || t==='s') {
                      [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
                         if((t==='k'||t==='j')&&dc*dr!==0) return; if((t==='a'||t==='s')&&dc*dr===0) return;
                         const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) addMove(nc,nr);
                      });
-                     // 【完美修补：引入飞将秒杀，防止AI自己暴露老将】
                      if (t==='k' || t==='j') {
                          let nr = r + (isRed ? -1 : 1);
                          while(nr >= 0 && nr <= 9) {
                              const tg = map[nr][c];
-                             if (tg) {
-                                 if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); // 可以吃掉对面老将
-                                 break;
-                             }
+                             if (tg) { if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); break; }
                              nr += (isRed ? -1 : 1);
                          }
                      }
@@ -424,16 +578,16 @@
                         const tc=c+dc, tr=r+dr;
                         if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
                             const br=r+dr/2, bc=c+dc/2;
-                            if(br>=0&&br<10&&bc>=0&&bc<9 && !map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc, tr); }
+                            if(br>=0&&br<10&&bc>=0&&bc<9 && !map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc,tr); }
                         }
                     });
                 }
             }
-            return moves.sort((a,b) => b.val - a.val);
+            return moves.sort((a,b) => b.val - a.val); 
         },
+
         quiesce(map, alpha, beta, isMax) {
             let stand_pat = this.eval(map);
-            // 【致命修补：best必须从stand_pat起步，杜绝“吃子不如站着”的幻觉】
             let best = stand_pat;
 
             if (isMax) {
@@ -444,7 +598,9 @@
                 beta = Math.min(beta, stand_pat);
             }
 
-            const moves = this.genMoves(map, isMax, true, -1); 
+            // 🟢 V16 修复：参数语义隔离
+            const isRed = isMax;
+            const moves = this.genMoves(map, isRed, true, -1); 
             for(let m of moves) {
                 const t = map[m.tr][m.tc];
                 if(t && (t==='k'||t==='K')) return isMax ? 10000 : -10000;
@@ -460,43 +616,66 @@
                     best = Math.min(best, val); 
                     beta = Math.min(beta, best); 
                 }
-                if(beta <= alpha) break;
+                if(beta <= alpha) break; 
             }
             return best;
         },
-        search(map, depth, alpha, beta, isMax, ply) {
-            // 【修补懦夫平局 (Contempt Factor)】：发现搜索树重复，给予严厉惩罚 (-500/500)，逼迫AI进攻
-            for (let i = 0; i < ply; i++) {
+
+        search(map, depth, alpha, beta, isMax, ply, rootPathLen) {
+            const currentPathIdx = rootPathLen + ply;
+            for (let i = 0; i < currentPathIdx; i++) {
                 if (this.path[i] === Zobrist.key) return isMax ? -500 : 500; 
             }
-            this.path[ply] = Zobrist.key;
+            this.path[currentPathIdx] = Zobrist.key;
 
             const ttVal = TT.probe(Zobrist.key, depth, alpha, beta, isMax);
             if(ttVal !== null) return ttVal;
             
             if(depth === 0) return this.quiesce(map, alpha, beta, isMax);
 
-            const moves = this.genMoves(map, isMax, false, ply);
+            // 🟢 V16 修复：参数语义隔离
+            const isRed = isMax;
+            const moves = this.genMoves(map, isRed, false, ply);
             let best = isMax ? -Infinity : Infinity;
             
             const oldAlpha = alpha;
             const oldBeta = beta;
+            let moveCount = 0;
 
             for(let m of moves) {
+                moveCount++;
                 const t = map[m.tr][m.tc];
                 if(t && (t==='k'||t==='K')) return isMax ? 10000 + depth : -10000 - depth;
                 
                 Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc); 
                 if(t) Zobrist.toggle(t, m.tr, m.tc);         
                 Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc); 
-                
                 map[m.tr][m.tc] = map[m.fr][m.fc]; map[m.fr][m.fc] = 0;
-                const val = this.search(map, depth-1, alpha, beta, !isMax, ply + 1);
                 
-                map[m.fr][m.fc] = map[m.tr][m.tc]; map[m.tr][m.tc] = t;
-                Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
+                let val;
+                let needsFullSearch = true;
+
+                if (depth >= 3 && moveCount > 4 && !m.isCapture) {
+                    let isKiller = false;
+                    if (this.killers[ply]) {
+                        isKiller = (this.killers[ply][0] && this.killers[ply][0].fc === m.fc && this.killers[ply][0].fr === m.fr && this.killers[ply][0].tc === m.tc && this.killers[ply][0].tr === m.tr) ||
+                                   (this.killers[ply][1] && this.killers[ply][1].fc === m.fc && this.killers[ply][1].fr === m.fr && this.killers[ply][1].tc === m.tc && this.killers[ply][1].tr === m.tr);
+                    }
+                    if (!isKiller) {
+                        val = this.search(map, depth - 2, alpha, beta, !isMax, ply + 1, rootPathLen); 
+                        needsFullSearch = isMax ? val > alpha : val < beta; 
+                    }
+                }
+
+                if (needsFullSearch) {
+                    val = this.search(map, depth - 1, alpha, beta, !isMax, ply + 1, rootPathLen);
+                }
+                
+                Zobrist.toggle(map[m.tr][m.tc], m.tr, m.tc); 
                 if(t) Zobrist.toggle(t, m.tr, m.tc);
-                Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
+                Zobrist.toggle(map[m.tr][m.tc], m.fr, m.fc);
+                map[m.fr][m.fc] = map[m.tr][m.tc]; 
+                map[m.tr][m.tc] = t;
 
                 if(isMax) {
                     if (val > best) best = val;
@@ -507,7 +686,7 @@
                 }
                 
                 if(beta <= alpha) { 
-                    if (!m.isCapture && ply < 64) {
+                    if (!m.isCapture && ply < 128) { 
                         if (!this.killers[ply][0] || this.killers[ply][0].fc !== m.fc || this.killers[ply][0].fr !== m.fr || this.killers[ply][0].tc !== m.tc || this.killers[ply][0].tr !== m.tr) {
                             this.killers[ply][1] = this.killers[ply][0];
                             this.killers[ply][0] = m;
@@ -518,27 +697,26 @@
                 }
             }
 
-            // 【致命修补：完美对齐的标志位计算】杜绝下界污染
-            let flag = 0; // Exact
-            if (best <= oldAlpha) flag = 1; // Upperbound
-            else if (best >= oldBeta) flag = 2; // Lowerbound
+            let flag = 0; 
+            if (best <= oldAlpha) flag = 1; 
+            else if (best >= oldBeta) flag = 2; 
             
             TT.store(Zobrist.key, depth, best, flag, isMax);
             return best;
         },
-        think(map, depth, historyKeys, isHint = false) {
-            const strKey = map.flat().join('');
-            const initialKey = "rnbakabnr0000000000c00000c0p0p0p0p0p000000000000000000P0P0P0P0P0C00000C0000000000RNBAKABNR";
-            if (strKey === initialKey && historyKeys.length === 1 && !isHint) {
-                const book = [ {fc:1, fr:0, tc:2, tr:2}, {fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:2, tc:4, tr:2}, {fc:7, fr:2, tc:4, tr:2} ];
-                return book[Math.floor(Math.random() * book.length)];
-            }
 
+        think(map, depth, historyMaps, turnColor, workerId = 0, totalWorkers = 1) {
+            const isRedTurn = (turnColor === 'r');
             Zobrist.computeFull(map);
-            TT.map.clear();
-            this.killers = Array.from({length: 64}, () => [null, null]);
+            this.killers = Array.from({length: 128}, () => [null, null]);
             this.historyTable = new Int32Array(8100);
-            this.path[0] = Zobrist.key; 
+            
+            let pathLen = 0;
+            if (historyMaps) {
+                for (let hMap of historyMaps) { this.path[pathLen++] = Zobrist.computeFull(hMap); }
+            }
+            Zobrist.computeFull(map); 
+            this.path[pathLen] = Zobrist.key; 
 
             let phaseMat = 0;
             for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
@@ -549,8 +727,6 @@
             this.val_c = Math.floor(350 + 100 * phase);
             this.val_n = Math.floor(450 - 50 * phase);
 
-            let bestMove = null;
-            const isRedTurn = isHint; 
             const moves = this.genMoves(map, isRedTurn, false, 0); 
             if(moves.length === 0) return null; 
 
@@ -562,25 +738,46 @@
                 
                 const legal = Rules.isLegal(map, isRedTurn);
                 const kStr = map.flat().join(''); 
-                const count = historyKeys.filter(k => k === kStr).length;
+                let count = 0;
+                for (let hm of historyMaps) { if (hm.flat().join('') === kStr) count++; }
                 
                 map[m.fr][m.fc] = saveF; map[m.tr][m.tc] = saveT;
                 
-                // 【核心：根节点避让机制】
                 if(legal) {
-                    if (count >= 2) { continue; } // 如果已经重复，绝对不走
+                    if (count >= 2) continue; 
                     validMoves.push(m);
                 }
             }
             if(validMoves.length === 0) return null;
 
+            let myMoves;
+            if (TT.isShared) {
+                myMoves = [...validMoves];
+                const shift = workerId % myMoves.length;
+                myMoves = myMoves.slice(shift).concat(myMoves.slice(0, shift));
+            } else {
+                myMoves = validMoves.filter((_, idx) => idx % totalWorkers === workerId);
+            }
+            if(myMoves.length === 0) return null;
+
+            let globalBestMove = null;
+            let globalBestVal = isRedTurn ? -Infinity : Infinity;
+            let prevScore = isRedTurn ? -Infinity : Infinity;
+
             for(let d=1; d<=depth; d++) {
                 let bestVal = isRedTurn ? -Infinity : Infinity; 
+                
                 let alpha = -Infinity, beta = Infinity;
-                const noise = (Math.random() - 0.5) * 0.5;
+                if (d >= 3 && Math.abs(prevScore) < 9000) {
+                    alpha = prevScore - 50;
+                    beta = prevScore + 50;
+                }
 
-                for(let i=0; i<validMoves.length; i++) {
-                    const m = validMoves[i];
+                let bestMove = null;
+                const noise = (Math.random() - 0.5) * (workerId + 1) * 0.5; 
+
+                for(let i=0; i<myMoves.length; i++) {
+                    const m = myMoves[i];
                     const t = map[m.tr][m.tc];
                     
                     Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
@@ -588,12 +785,19 @@
                     Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
                     map[m.tr][m.tc] = map[m.fr][m.fc]; map[m.fr][m.fc] = 0;
                     
-                    const val = this.search(map, d-1, alpha, beta, !isRedTurn, 1) + noise;
+                    let val = this.search(map, d-1, alpha, beta, !isRedTurn, 1, pathLen) + noise;
                     
-                    map[m.fr][m.fc] = map[m.tr][m.tc]; map[m.tr][m.tc] = t;
-                    Zobrist.toggle(map[m.fr][m.fc], m.tr, m.tc);
+                    if (d >= 3 && (val <= alpha || val >= beta)) {
+                        alpha = -Infinity;
+                        beta = Infinity;
+                        val = this.search(map, d-1, alpha, beta, !isRedTurn, 1, pathLen) + noise;
+                    }
+                    
+                    Zobrist.toggle(map[m.tr][m.tc], m.tr, m.tc); 
                     if(t) Zobrist.toggle(t, m.tr, m.tc);
-                    Zobrist.toggle(map[m.fr][m.fc], m.fr, m.fc);
+                    Zobrist.toggle(map[m.tr][m.tc], m.fr, m.fc);
+                    map[m.fr][m.fc] = map[m.tr][m.tc]; 
+                    map[m.tr][m.tc] = t;
 
                     if (isRedTurn) {
                         if (val > bestVal) { bestVal = val; bestMove = m; }
@@ -603,24 +807,34 @@
                         beta = Math.min(beta, bestVal); 
                     }
                 }
+                if (bestMove) {
+                    globalBestMove = bestMove;
+                    globalBestVal = bestVal;
+                    prevScore = bestVal; 
+                }
             }
-            return bestMove;
+            return { move: globalBestMove, val: globalBestVal };
         }
     };
     
     onmessage = e => {
         if(e.data.type === 'go') {
-            const ret = Engine.think(e.data.map, e.data.depth, e.data.historyKeys || [], e.data.isHint || false);
-            if (e.data.isHint) {
-                postMessage({type:'hint', move:ret});
-            } else {
-                postMessage({type:'done', move:ret});
-            }
+            if (!TT.isInitialized) TT.init(e.data.sharedTT);
+            if (!TT.isShared) TT.clear(); 
+
+            const ret = Engine.think(e.data.map, e.data.depth, e.data.historyMaps, e.data.turn, e.data.workerId, e.data.totalWorkers);
+            postMessage(ret);
         }
     }
 </script>
 
 <script>
+const THEMES = {
+    classic: { bg: '#e4d0a6', line: '#5d4037', p1: '#fff5f5', p2: '#f0fff4', p3: '#d0d0d0', rb: '#c0392b', bb: '#27ae60', rTxt: '#c00', bTxt: '#1e8449' },
+    wood: { bg: '#d1a870', line: '#4a2c11', p1: '#f2e2c4', p2: '#e3c79b', p3: '#c49a64', rb: '#8b0000', bb: '#1a1a1a', rTxt: '#8b0000', bTxt: '#1a1a1a' },
+    green: { bg: '#9bb89c', line: '#2e4c30', p1: '#ffffff', p2: '#ffffff', p3: '#cccccc', rb: '#c0392b', bb: '#2c3e50', rTxt: '#e74c3c', bTxt: '#2c3e50' }
+};
+
 const EvalC = {
     vals: { 'k':10000, 'c':450, 'n':400, 'r':900, 'b':200, 'a':200, 'p':100, 'm':400, 'x':900, 's':200, 'j':200 },
     pst: { 
@@ -631,8 +845,7 @@ const EvalC = {
     }
 };
 
-// 【核心修复：确保主界面马腿检测与引擎一致】
-const Rules = {
+const RulesUI = {
     isLegal(map, myColorIsRed) {
         let rK = null, bK = null;
         for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
@@ -642,7 +855,9 @@ const Rules = {
         if(!rK || !bK) return true; 
         if(rK.c === bK.c) {
             let count = 0;
-            for(let r = bK.r + 1; r < rK.r; r++) if(map[r][rK.c]) count++;
+            const minR = Math.min(rK.r, bK.r);
+            const maxR = Math.max(rK.r, bK.r);
+            for(let r = minR + 1; r < maxR; r++) if(map[r][rK.c]) count++;
             if(count === 0) return false;
         }
         const myKing = myColorIsRed ? rK : bK;
@@ -655,13 +870,13 @@ const Rules = {
                 if(p) {
                     const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
                     if(isEnemy) {
-                        const t = p.toLowerCase();
+                        const type = p.toLowerCase();
                         if(!jump) {
-                            if(t === 'r' || t === 'k') return false; 
-                            if(t === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
+                            if(type === 'r' || type === 'k') return false; 
+                            if(type === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
                                 if(enemyColorLower && r > myKing.r) {} else if(!enemyColorLower && r < myKing.r) {} else return false; 
                             }
-                        } else if(t === 'c') return false;
+                        } else if(type === 'c') return false;
                     }
                     if(p) { if(jump) break; jump = true; }
                 }
@@ -676,9 +891,11 @@ const Rules = {
                 if(p) {
                     const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
                     if(isEnemy && p.toLowerCase() === 'n') {
-                        const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : k[0]);
-                        const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : k[1]);
-                        if(!map[legR][legC]) return false;
+                        const legC = myKing.c + (Math.abs(k[0])===2 ? k[0]/2 : 0);
+                        const legR = myKing.r + (Math.abs(k[1])===2 ? k[1]/2 : 0);
+                        if(legR>=0 && legR<10 && legC>=0 && legC<9) {
+                            if(!map[legR][legC]) return false;
+                        }
                     }
                 }
             }
@@ -691,6 +908,7 @@ const Sound = {
     ctx: null,
     init() { try { const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC(); } catch(e) {} },
     play(type) {
+        if(!Game.soundOn) return; 
         if(!this.ctx) this.init();
         if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
         if(!this.ctx) return;
@@ -730,79 +948,153 @@ const Sound = {
 };
 
 const View = {
-    cvs: document.getElementById('board'), ctx: null, grid: 0, margin: 0,
+    cvs: document.getElementById('board'), ctx: null, grid: 0, margin: 0, theme: 'classic', flipped: false,
     init() {
         this.ctx = this.cvs.getContext('2d');
         window.addEventListener('resize', () => { this.resize(); if(Game.map) Game.draw(); });
         this.resize();
+    },
+    setTheme(t) {
+        this.theme = t;
+        if(Game.map) Game.draw(); 
     },
     resize() {
         const box = document.getElementById('boardContainer');
         const dpr = window.devicePixelRatio || 2;
         let w = box.clientWidth, h = box.clientHeight;
         if(w===0) w=350; if(h===0) h=390;
-        if(w/h > 9/10) w = h*(9/10); else h = w/(9/10);
+        
+        const targetRatio = 10.4 / 11.4;
+        if(w/h > targetRatio) w = h * targetRatio; else h = w / targetRatio;
+        
         this.cvs.style.width = w+'px'; this.cvs.style.height = h+'px';
         this.cvs.width = w*dpr; this.cvs.height = h*dpr;
-        this.grid = (w*dpr)/10; this.margin = this.grid;
-        this.grid = (this.cvs.width - 2*this.margin)/8;
+        this.grid = this.cvs.width / 10.4; 
+        this.margin = this.grid * 1.2; 
     },
     draw(map, sel, last, hints=[], anim=null) {
         if(!this.ctx || !map) return;
         const ctx = this.ctx, g = this.grid, m = this.margin, W = this.cvs.width, H = this.cvs.height;
-        ctx.fillStyle = '#e6d0a0'; ctx.fillRect(0,0,W,H);
+        const T = THEMES[this.theme];
+        const fx = c => this.flipped ? 8 - c : c;
+        const fy = r => this.flipped ? 9 - r : r;
         
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#8d6e63'; ctx.font = `bold ${g*0.3}px "Microsoft YaHei"`;
-        const colsRed = ['九','八','七','六','五','四','三','二','一'];
-        const colsBlk = ['1','2','3','4','5','6','7','8','9'];
-        for(let c=0; c<9; c++) {
-            ctx.fillText(colsBlk[c], m + c*g, m - g*0.5); 
-            ctx.fillText(colsRed[c], m + c*g, H - m + g*0.5); 
-        }
+        ctx.fillStyle = T.bg; ctx.fillRect(0,0,W,H);
+        document.getElementById('boardContainer').style.background = T.bg;
         
-        ctx.lineWidth = 2*(window.devicePixelRatio||2); ctx.strokeStyle = '#5d4037'; ctx.lineCap = 'round';
+        const baseLineW = g * 0.035;
+        
+        ctx.strokeStyle = T.line; 
+        ctx.lineCap = 'square';
+        ctx.lineWidth = baseLineW * 2.2;
+        ctx.strokeRect(m - baseLineW/2, m - baseLineW/2, 8*g + baseLineW, 9*g + baseLineW);
+        
+        ctx.lineWidth = baseLineW * 0.8; 
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        for(let i=0; i<10; i++) { ctx.moveTo(m, m+i*g); ctx.lineTo(W-m, m+i*g); }
-        for(let i=0; i<9; i++) {
-            if(i===0||i===8) { ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, H-m); } 
-            else { ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, m+4*g); ctx.moveTo(m+i*g, m+5*g); ctx.lineTo(m+i*g, H-m); }
+        for(let i=1; i<9; i++) { ctx.moveTo(m, m+i*g); ctx.lineTo(W-m, m+i*g); }
+        for(let i=1; i<8; i++) {
+            ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, m+4*g); 
+            ctx.moveTo(m+i*g, m+5*g); ctx.lineTo(m+i*g, H-m); 
         }
         [[3,0],[3,7]].forEach(([c,r])=>{
             ctx.moveTo(m+c*g, m+r*g); ctx.lineTo(m+(c+2)*g, m+(r+2)*g);
             ctx.moveTo(m+(c+2)*g, m+r*g); ctx.lineTo(m+c*g, m+(r+2)*g);
         });
         ctx.stroke();
+
+        const drawCross = (c, r) => {
+            const x = m + c*g, y = m + r*g, o = g*0.08, l = g*0.2;
+            ctx.beginPath(); ctx.lineWidth = baseLineW * 0.8;
+            if (c > 0) { ctx.moveTo(x-o-l, y-o); ctx.lineTo(x-o, y-o); ctx.lineTo(x-o, y-o-l); ctx.moveTo(x-o-l, y+o); ctx.lineTo(x-o, y+o); ctx.lineTo(x-o, y+o+l); }
+            if (c < 8) { ctx.moveTo(x+o+l, y-o); ctx.lineTo(x+o, y-o); ctx.lineTo(x+o, y-o-l); ctx.moveTo(x+o+l, y+o); ctx.lineTo(x+o, y+o); ctx.lineTo(x+o, y+o+l); }
+            ctx.stroke();
+        };
+        [1, 7].forEach(c => { drawCross(c, 2); drawCross(c, 7); });
+        [0, 2, 4, 6, 8].forEach(c => { drawCross(c, 3); drawCross(c, 6); });
         
-        ctx.font = `bold ${g*0.6}px "Microsoft YaHei"`;
-        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
-            if(map[r][c]) this.drawPiece(ctx, map[r][c], m+c*g, m+r*g, g);
+        ctx.font = `bold ${g*0.55}px "STKaiti", "Kaiti SC", "Kaiti", serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillText(this.flipped?"界    汉":"楚    河", m + 2*g, m + 4.5*g + 2);
+        ctx.fillStyle = T.line;
+        ctx.fillText(this.flipped?"界    汉":"楚    河", m + 2*g, m + 4.5*g);
+        
+        ctx.save();
+        ctx.translate(m + 6*g, m + 4.5*g);
+        ctx.rotate(Math.PI);
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillText(this.flipped?"河    楚":"汉    界", 0, 2);
+        ctx.fillStyle = T.line;
+        ctx.fillText(this.flipped?"河    楚":"汉    界", 0, 0);
+        ctx.restore();
+
+        ctx.font = `bold ${g*0.3}px "Microsoft YaHei", sans-serif`;
+        const colsRed = ['九','八','七','六','五','四','三','二','一'];
+        const colsBlk = ['1','2','3','4','5','6','7','8','9'];
+        for(let c=0; c<9; c++) {
+            const drawC = this.flipped ? 8 - c : c;
+            ctx.fillText(colsBlk[c], m + drawC*g, m - g*0.8); 
+            ctx.fillText(colsRed[c], m + drawC*g, H - m + g*0.8); 
         }
-        if(sel) this.mark(sel.c, sel.r, '#30D158');
-        if(last) { this.mark(last.fc, last.fr, 'rgba(10,132,255,0.6)'); this.mark(last.tc, last.tr, 'rgba(10,132,255,0.8)'); }
+        
+        const redCheck = !RulesUI.isLegal(map, true);
+        const blkCheck = !RulesUI.isLegal(map, false);
+
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = map[r][c];
+            if(k) {
+                if ((k === 'K' && redCheck) || (k === 'k' && blkCheck)) {
+                    ctx.beginPath(); ctx.arc(m+fx(c)*g, m+fy(r)*g, g*0.5, 0, 6.28);
+                    ctx.fillStyle = 'rgba(255, 69, 58, 0.4)'; ctx.fill();
+                }
+                this.drawPiece(ctx, k, m+fx(c)*g, m+fy(r)*g, g, T);
+            }
+        }
+        
+        if(sel) this.mark(fx(sel.c), fy(sel.r), '#30D158');
+        if(last) { this.mark(fx(last.fc), fy(last.fr), 'rgba(10,132,255,0.6)'); this.mark(fx(last.tc), fy(last.tr), 'rgba(10,132,255,0.8)'); }
         hints.forEach(h => {
-            ctx.beginPath(); ctx.arc(m+h.tc*g, m+h.tr*g, g*0.12, 0, 6.28); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+            ctx.beginPath(); ctx.arc(m+fx(h.tc)*g, m+fy(h.tr)*g, g*0.12, 0, 6.28); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
         });
 
         if(anim) {
-            const curX = m + anim.m.fc*g + (anim.m.tc - anim.m.fc)*g * anim.p;
-            const curY = m + anim.m.fr*g + (anim.m.tr - anim.m.fr)*g * anim.p;
-            this.drawPiece(ctx, anim.piece, curX, curY, g);
+            const curX = m + (fx(anim.m.fc) + (fx(anim.m.tc) - fx(anim.m.fc)) * anim.p)*g;
+            const curY = m + (fy(anim.m.fr) + (fy(anim.m.tr) - fy(anim.m.fr)) * anim.p)*g;
+            this.drawPiece(ctx, anim.piece, curX, curY, g, T);
         }
     },
-    drawPiece(ctx, k, x, y, g) {
+    
+    drawPiece(ctx, k, x, y, g, T) {
         const isRed = k<'a';
-        ctx.beginPath(); ctx.arc(x+g*0.06, y+g*0.06, g*0.44, 0, 6.28); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
-        ctx.beginPath(); ctx.arc(x, y, g*0.44, 0, 6.28);
-        const grad = ctx.createRadialGradient(x-g*0.1, y-g*0.1, g*0.1, x, y, g*0.44);
-        grad.addColorStop(0, isRed ? '#fff5f5' : '#f0fff4'); grad.addColorStop(1, '#d0d0d0');
+        const pSize = g * 0.46; 
+        
+        ctx.save();
+        ctx.beginPath(); ctx.arc(x, y, pSize, 0, 6.28);
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = g * 0.1;
+        ctx.shadowOffsetX = g * 0.04;
+        ctx.shadowOffsetY = g * 0.06;
+        
+        const grad = ctx.createRadialGradient(x-g*0.15, y-g*0.15, g*0.05, x, y, pSize);
+        grad.addColorStop(0, isRed ? T.p1 : T.p2); grad.addColorStop(1, T.p3);
         ctx.fillStyle = grad; ctx.fill();
-        ctx.lineWidth = g*0.03; ctx.strokeStyle = isRed ? '#c0392b' : '#27ae60'; ctx.stroke();
-        ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 2; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
-        ctx.fillStyle = isRed ? '#c00' : '#1e8449'; 
-        const txt = {'k':'将','a':'士','b':'象','n':'马','r':'车','c':'炮','p':'卒', 'K':'帅','A':'仕','B':'相','N':'马','R':'车','C':'炮','P':'兵'};
-        ctx.fillText(txt[k]||k, x, y+g*0.03); 
-        ctx.shadowColor = "transparent";
+        ctx.restore(); 
+        
+        ctx.beginPath(); ctx.arc(x, y, pSize, 0, 6.28);
+        ctx.lineWidth = g*0.025; ctx.strokeStyle = isRed ? T.rb : T.bb; ctx.stroke();
+        
+        ctx.beginPath(); ctx.arc(x, y, pSize * 0.82, 0, 6.28);
+        ctx.lineWidth = g*0.015; ctx.globalAlpha = 0.2; ctx.stroke(); ctx.globalAlpha = 1.0;
+        
+        ctx.fillStyle = isRed ? T.rTxt : T.bTxt; 
+        const txt = {'k':'將','a':'士','b':'象','n':'馬','r':'車','c':'砲','p':'卒', 'K':'帅','A':'仕','B':'相','N':'马','R':'车','C':'炮','P':'兵'};
+        
+        ctx.font = `bold ${g*0.52}px "STKaiti", "Kaiti SC", "Kaiti", serif`; 
+        ctx.textBaseline = 'middle'; 
+        ctx.textAlign = 'center';    
+        ctx.fillText(txt[k]||k, x, y - g*0.03); 
     },
     mark(c, r, color) {
         const x = this.margin + c*this.grid, y = this.margin + r*this.grid, s = this.grid*0.48, l = this.grid*0.15;
@@ -852,15 +1144,52 @@ const Particles = {
     }
 };
 
+let globalWorkerUrl = null;
+
 const Game = {
-    map: [], turn: 'r', sel: null, last: null, history: [], historyKeys: [], worker: null, 
-    gameStarted: false, gameOver: false, hintMove: null, movesCount: 0,
+    map: [], turn: 'r', sel: null, last: null, history: [], historyKeys: [], workers: [], 
+    // 🟢 V16 修复：增加 isAnimating 锁，防止时空穿梭
+    gameStarted: false, gameOver: false, isAnimating: false, hintMove: null, movesCount: 0,
+    editMode: false, editPiece: 'K', mode: 'h-ai',
+    workerEpoch: 0, numWorkers: 6, soundOn: true, autoPlay: false,
+    isThinking: false, isInterrupted: false, pendingResolves: [], sharedTTBuffer: null,
     
     LIMIT_STEP: 180, LIMIT_GAME: 1200, timers: { r: 1200, b: 1200, step: 180, t: null },
 
+    resetWorkers() {
+        this.isInterrupted = true; 
+        if(this.workers) this.workers.forEach(w => w.terminate());
+        this.workers = [];
+        
+        if (this.pendingResolves) {
+            this.pendingResolves.forEach(res => res(null)); 
+        }
+        this.pendingResolves = [];
+
+        try {
+            if(typeof SharedArrayBuffer !== 'undefined') {
+                this.sharedTTBuffer = new SharedArrayBuffer(109051904); 
+                if (this.workerEpoch === 0) UI.log("🔥 跨域隔离检测通过：已激活 104MB 物理共享内存！", "sys");
+            } else {
+                this.sharedTTBuffer = null;
+            }
+        } catch(e) {
+            this.sharedTTBuffer = null;
+            if (this.workerEpoch === 0) UI.log("⚠️ 未检测到跨域隔离头，降级为本地独立内存。请修改 Nginx 配置以解锁极限性能。", "warn");
+        }
+
+        if (!globalWorkerUrl) {
+            const blob = new Blob([document.getElementById('worker-code').textContent], {type:"text/javascript"});
+            globalWorkerUrl = window.URL.createObjectURL(blob);
+        }
+        for(let i=0; i<this.numWorkers; i++) {
+            this.workers.push(new Worker(globalWorkerUrl));
+        }
+        this.workerEpoch++;
+    },
+
     init() {
         const fen = [['r','n','b','a','k','a','b','n','r'],[0,0,0,0,0,0,0,0,0],[0,'c',0,0,0,0,0,'c',0],['p',0,'p',0,'p',0,'p',0,'p'],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],['P',0,'P',0,'P',0,'P',0,'P'],[0,'C',0,0,0,0,0,'C',0],[0,0,0,0,0,0,0,0,0],['R','N','B','A','K','A','B','N','R']];
-        
         const hc = parseInt(document.getElementById('handicap')?.value || '0');
         if (hc === 1) fen[0][1] = 0; 
         if (hc === 2) { fen[0][1] = 0; fen[0][7] = 0; } 
@@ -869,55 +1198,124 @@ const Game = {
         this.map = JSON.parse(JSON.stringify(fen));
         this.turn = 'r'; this.sel = null; this.last = null; this.hintMove = null; this.movesCount = 0;
         this.history = []; this.historyKeys = [this.toKey(this.map)]; 
-        this.gameStarted = false; this.gameOver = false;
+        this.gameStarted = false; this.gameOver = false; this.isAnimating = false; this.autoPlay = false; this.isThinking = false;
+        
+        this.mode = document.getElementById('gameMode').value;
+        const btn = document.getElementById("autoBtn");
+        if(btn) { btn.innerHTML = "▶️ 托管"; btn.classList.remove("active-toggle"); }
         
         this.timers = { r: this.LIMIT_GAME, b: this.LIMIT_GAME, step: this.LIMIT_STEP, t: null };
-        
-        if(this.worker) this.worker.terminate();
-        const blob = new Blob([document.getElementById('worker-code').textContent], {type:"text/javascript"});
-        this.worker = new Worker(window.URL.createObjectURL(blob));
-        this.worker.onmessage = e => {
-            if(e.data.type==='done') {
-                if(this.gameOver) return;
-                UI.status("红方走棋", false);
-                if(e.data.move) this.animateMove(e.data.move); 
-                else this.end("AI 认输 / 无棋可走，红方获胜！");
-            }
-            else if(e.data.type==='hint') {
-                UI.status("红方走棋", false);
-                if(e.data.move) {
-                    this.hintMove = e.data.move;
-                    this.draw();
-                    const notStr = this.getNotation(this.map, e.data.move);
-                    UI.log(`💡 提示: 最佳走法 [${notStr}]`, 'sys');
-                } else { UI.log("💡 当前已无路可走", 'warn'); }
-            }
-        };
 
-        View.init(); setTimeout(() => this.draw(), 50);
+        // 🟢 V16 修复：先清理旧日志，再初始化核心，保住系统提示
         document.getElementById('log').innerHTML = ''; 
-        UI.log("最终重置：已启用64位引擎，修正所有战术逻辑！", 'sys');
+        
+        this.resetWorkers();
+        View.init(); 
+        setTimeout(() => Game.draw(), 50); 
+        
+        UI.log(`系统初始化完成：V16 终极版已就绪！`, 'sys');
         this.uiUpdate();
         
         const h = e => {
-            if(this.gameOver || this.turn !== 'r' || (this.gameStarted && !this.timers.t)) return;
+            if(this.gameOver || (this.gameStarted && !this.timers.t) || this.isThinking || this.isAnimating) return; 
+            if(this.mode === 'h-ai' && this.turn === 'b' && !this.editMode) return; 
+            if(this.autoPlay) this.toggleAuto(); 
             e.preventDefault();
             const rect = View.cvs.getBoundingClientRect();
             const x = (e.clientX||e.touches[0].clientX) - rect.left, y = (e.clientY||e.touches[0].clientY) - rect.top;
-            const c = Math.round((x * (View.cvs.width/rect.width) - View.margin)/View.grid);
-            const r = Math.round((y * (View.cvs.height/rect.height) - View.margin)/View.grid);
+            
+            const cRaw = Math.round((x * (View.cvs.width/rect.width) - View.margin)/View.grid);
+            const rRaw = Math.round((y * (View.cvs.height/rect.height) - View.margin)/View.grid);
+            
+            const c = View.flipped ? 8 - cRaw : cRaw;
+            const r = View.flipped ? 9 - rRaw : rRaw;
+            
             if(c>=0 && c<9 && r>=0 && r<10) this.click(c, r);
         };
         View.cvs.onmousedown = h; View.cvs.ontouchstart = h;
     },
 
+    draw() { 
+        View.draw(this.map, this.sel, this.last); 
+        if (this.hintMove && !Particles.animating) {
+            const m = View.margin, g = View.grid, hm = this.hintMove;
+            const fx = c => View.flipped ? 8 - c : c;
+            const fy = r => View.flipped ? 9 - r : r;
+            View.ctx.beginPath();
+            View.ctx.moveTo(m + fx(hm.fc) * g, m + fy(hm.fr) * g); 
+            View.ctx.lineTo(m + fx(hm.tc) * g, m + fy(hm.tr) * g);
+            View.ctx.strokeStyle = '#ff9f0a'; 
+            View.ctx.lineWidth = 4; 
+            View.ctx.setLineDash([8, 8]); 
+            View.ctx.stroke();
+            View.ctx.setLineDash([]); 
+            View.mark(fx(hm.fc), fy(hm.fr), '#ff9f0a'); 
+            View.mark(fx(hm.tc), fy(hm.tr), '#ff9f0a');
+        }
+    },
+
     toKey(map) { return map.flat().join(''); },
+
+    changeMode() {
+        this.mode = document.getElementById('gameMode').value;
+        UI.log(this.mode === 'h-h' ? "已切换至双人推演模式" : "已切换至人机模式", 'sys');
+    },
+
+    toggleEdit() {
+        if(this.isThinking || this.isAnimating) return;
+        this.editMode = true;
+        document.getElementById('editOverlay').style.display = 'flex';
+        UI.log("进入创意摆局模式...", 'warn');
+        clearInterval(this.timers.t);
+        this.sel = null; this.last = null; this.hintMove = null;
+        if(this.autoPlay) this.toggleAuto();
+        this.draw(); 
+    },
+
+    selEdit(p, el) {
+        this.editPiece = p;
+        document.querySelectorAll('.p-piece, .p-clear').forEach(e => e.classList.remove('sel'));
+        el.classList.add('sel');
+    },
+
+    clearBoard() {
+        this.resetWorkers();
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) this.map[r][c] = 0;
+        Sound.play('move'); this.draw();
+    },
+
+    finishEdit() {
+        this.resetWorkers();
+        let rk=0, bk=0;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            if(this.map[r][c]==='K') rk++;
+            if(this.map[r][c]==='k') bk++;
+        }
+        if(rk!==1 || bk!==1) { alert("配置无效：红黑双方必须各有一个将/帅！"); return; }
+        
+        this.editMode = false;
+        document.getElementById('editOverlay').style.display = 'none';
+        this.history = []; this.historyKeys = [this.toKey(this.map)]; 
+        this.movesCount = 0; this.turn = 'r'; this.gameStarted = false; this.gameOver = false;
+        this.timers = { r: this.LIMIT_GAME, b: this.LIMIT_GAME, step: this.LIMIT_STEP, t: null };
+        UI.log("配置写入完成，重新开局！", 'sys');
+        this.uiUpdate(); this.draw(); 
+    },
 
     evaluate() {
         let phaseMat = 0;
+        let rKing = null, bKing = null;
+        let rA = 0, rE = 0, bA = 0, bE = 0;
+        
         for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
             const k = this.map[r][c];
-            if(k) { const t=k.toLowerCase(); if(t==='r'||t==='c'||t==='n') phaseMat++; }
+            if(k) { 
+                const t=k.toLowerCase(); 
+                if(t==='r'||t==='c'||t==='n') phaseMat++; 
+                if (k === 'K') rKing = {r, c}; else if (k === 'k') bKing = {r, c};
+                else if (k === 'A' || k === 'S') rA++; else if (k === 'B' || k === 'X') rE++;
+                else if (k === 'a' || k === 's') bA++; else if (k === 'b' || k === 'x') bE++;
+            }
         }
         let phase = phaseMat / 12.0; if(phase>1) phase=1;
         const val_c = Math.floor(350 + 100 * phase);
@@ -930,8 +1328,29 @@ const Game = {
             const t = k.toLowerCase(), isRed = k<'a';
             let v = 0;
             if(t==='c') v = val_c; else if(t==='n') v = val_n; else v = EvalC.vals[t] || 0;
-            if(EvalC.pst[t]) v += EvalC.pst[t][isRed ? 9-r : r][c] || 0;
-            s += isRed ? v : -v; 
+            if(EvalC.pst[t] && EvalC.pst[t][isRed ? 9-r : r]) {
+                v += EvalC.pst[t][isRed ? 9-r : r][c] || 0;
+            }
+            
+            let mobility = 0, threat = 0;
+            if (t === 'r') {
+                const rDir = isRed ? 1 : -1; let isOpen = true;
+                for(let nr = r + rDir; nr >= 0 && nr < 10; nr += rDir) {
+                    const p = this.map[nr] && this.map[nr][c];
+                    if(p) { if(p.toLowerCase() === 'p' && (p < 'a') === isRed) isOpen = false; break; }
+                }
+                if(isOpen) mobility += 25;
+            } else if (t === 'p') {
+                const crossed = (isRed && r <= 4) || (!isRed && r >= 5);
+                if(crossed) { mobility += 30; if(c >= 3 && c <= 5) mobility += 15; }
+                const pDir = isRed ? -1 : 1; let isPassed = true;
+                for(let nr = r + pDir; nr >= 0 && nr < 10; nr += pDir) {
+                    const p = this.map[nr] && this.map[nr][c];
+                    if(p) { if(p.toLowerCase() === 'p') isPassed = false; break; }
+                }
+                if(isPassed && crossed) mobility += 20;
+            }
+            s += isRed ? (v + mobility) : -(v + mobility); 
         }
         return s;
     },
@@ -941,7 +1360,7 @@ const Game = {
         if (!p) return "";
         const isRed = p < 'a', t = p.toLowerCase();
         const nRed = {'p':'兵','c':'炮','r':'车','n':'马','b':'相','a':'仕','k':'帅'};
-        const nBlk = {'p':'卒','c':'炮','r':'车','n':'马','b':'象','a':'士','k':'将'};
+        const nBlk = {'p':'卒','c':'砲','r':'車','n':'馬','b':'象','a':'士','k':'將'};
         const cRed = ['九','八','七','六','五','四','三','二','一'];
         const cBlk = ['1','2','3','4','5','6','7','8','9'];
         const numR = ['一','二','三','四','五','六','七','八','九'];
@@ -980,72 +1399,214 @@ const Game = {
         return prefix + dir + end;
     },
 
-    hint() {
-        if(this.gameOver || this.turn !== 'r') return;
-        UI.status("思考最佳走法...", true);
-        this.hintMove = null;
-        const d = document.getElementById('depth').value;
-        this.worker.postMessage({ type:'go', map:this.map, depth: parseInt(d), historyKeys: this.historyKeys, isHint: true });
+    checkOpeningBook(map, historyMaps, turnColor) {
+        const isRedTurn = (turnColor === 'r');
+        const strKey = map.flat().join('');
+        const initialKey = "rnbakabnr0000000000c00000c0p0p0p0p0p000000000000000000P0P0P0P0P0C00000C0000000000RNBAKABNR";
+        
+        if (strKey === initialKey && historyMaps.length === 0 && isRedTurn) {
+            const book = [
+                {fc:7, fr:7, tc:4, tr:7}, {fc:1, fr:7, tc:4, tr:7}, 
+                {fc:6, fr:6, tc:6, tr:5}, {fc:2, fr:6, tc:2, tr:5}, 
+                {fc:6, fr:9, tc:4, tr:7}, {fc:2, fr:9, tc:4, tr:7}, 
+                {fc:7, fr:9, tc:6, tr:7}, {fc:1, fr:9, tc:2, tr:7}
+            ];
+            return book[Math.floor(Math.random() * book.length)];
+        }
+        if (historyMaps.length === 1 && !isRedTurn) {
+            let move = null;
+            if (map[7][4] === 'C') { 
+                const res = [{fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:0, tc:2, tr:2}, {fc:7, fr:2, tc:4, tr:2}, {fc:1, fr:2, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[5][6] === 'P') { 
+                const res = [{fc:7, fr:2, tc:6, tr:2}, {fc:2, fr:3, tc:2, tr:4}, {fc:2, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[5][2] === 'P') { 
+                const res = [{fc:1, fr:2, tc:2, tr:2}, {fc:6, fr:3, tc:6, tr:4}, {fc:6, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[7][4] === 'B') { 
+                const res = [{fc:7, fr:2, tc:4, tr:2}, {fc:1, fr:2, tc:4, tr:2}, {fc:7, fr:0, tc:6, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[7][6] === 'N' || map[7][2] === 'N') { 
+                const res = [{fc:6, fr:3, tc:6, tr:4}, {fc:2, fr:3, tc:2, tr:4}, {fc:7, fr:2, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else {
+                const res = [{fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:0, tc:2, tr:2}, {fc:2, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            }
+            return move;
+        }
+        return null;
     },
 
-    draw() { 
-        View.draw(this.map, this.sel, this.last); 
-        if (this.hintMove && !Particles.animating) {
-            const m = View.margin, g = View.grid, hm = this.hintMove;
-            View.ctx.beginPath();
-            View.ctx.moveTo(m + hm.fc * g, m + hm.fr * g); View.ctx.lineTo(m + hm.tc * g, m + hm.tr * g);
-            View.ctx.strokeStyle = '#ff9f0a'; View.ctx.lineWidth = 4; View.ctx.setLineDash([8, 8]); View.ctx.stroke();
-            View.ctx.setLineDash([]); 
-            View.mark(hm.fc, hm.fr, '#ff9f0a'); View.mark(hm.tc, hm.tr, '#ff9f0a');
+    async runWorkers(map, depth, historyMaps, turnColor) {
+        this.isInterrupted = false; 
+        const bookMove = this.checkOpeningBook(map, historyMaps, turnColor);
+        if (bookMove) {
+            UI.log("💡 触发国家大师级名谱，0毫秒响应", "sys");
+            return bookMove;
+        }
+
+        const currentEpoch = this.workerEpoch;
+        this.pendingResolves = []; 
+        
+        if (this.sharedTTBuffer) {
+            new Int8Array(this.sharedTTBuffer, 10 * 8388608, 8388608).fill(-1);
+        }
+        
+        const promises = this.workers.map((worker, i) => {
+            return new Promise(resolve => {
+                this.pendingResolves.push(resolve);
+                worker.onmessage = e => resolve(e.data);
+                worker.postMessage({ type: 'go', map, depth, historyMaps, turn: turnColor, workerId: i, totalWorkers: this.numWorkers, sharedTT: this.sharedTTBuffer });
+            });
+        });
+
+        const results = await Promise.all(promises);
+        this.pendingResolves = []; 
+        
+        if (this.isInterrupted || currentEpoch !== this.workerEpoch) return null;
+
+        let bestMove = null;
+        let bestVal = (turnColor === 'r') ? -Infinity : Infinity;
+
+        for (let res of results) {
+            if (res && res.move) {
+                if (turnColor === 'r') { 
+                    if (res.val > bestVal) { bestVal = res.val; bestMove = res.move; }
+                } else { 
+                    if (res.val < bestVal) { bestVal = res.val; bestMove = res.move; }
+                }
+            }
+        }
+        return bestMove;
+    },
+
+    async hint() {
+        if(this.gameOver || this.editMode || this.isThinking || this.isAnimating) return; 
+        this.isThinking = true;
+        
+        UI.status("LazySMP 并发神经预测中...", true);
+        this.hintMove = null;
+        const d = parseInt(document.getElementById('depth').value);
+        
+        await new Promise(r => setTimeout(r, 50));
+        const bestMove = await this.runWorkers(this.map, d, this.history, this.turn);
+        
+        this.isThinking = false;
+        if(this.isInterrupted || this.gameOver || this.editMode) return; 
+        
+        UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
+        if(bestMove) {
+            this.hintMove = bestMove;
+            this.draw();
+            const notStr = this.getNotation(this.map, bestMove);
+            UI.log(`💡 预测最佳走法: [${notStr}]`, 'sys');
+        } else { 
+            UI.log("💡 局面已死锁，无有效走法", 'warn'); 
+        }
+    },
+
+    toggleSound() {
+        this.soundOn = !this.soundOn;
+        const btn = document.getElementById("soundBtn");
+        if(btn) {
+            btn.textContent = this.soundOn ? "🔊 音效" : "🔇 静音";
+            btn.classList.toggle("active-toggle", !this.soundOn);
+        }
+    },
+
+    flipBoard() {
+        View.flipped = !View.flipped;
+        this.draw();
+    },
+
+    toggleAuto() {
+        this.autoPlay = !this.autoPlay;
+        const btn = document.getElementById("autoBtn");
+        if(btn) {
+            btn.textContent = this.autoPlay ? "⏸️ 停止托管" : "▶️ 托管";
+            btn.classList.toggle("active-toggle", this.autoPlay);
+        }
+        if(this.autoPlay && !this.gameOver && !this.isThinking) this.autoNext();
+    },
+
+    async autoNext() {
+        if(!this.autoPlay || this.gameOver || this.isThinking || this.isAnimating) return;
+        this.isThinking = true;
+        this.hintMove = null;
+        UI.status("底层 LazySMP 静默执行中...", true);
+        const d = parseInt(document.getElementById("depth").value);
+        
+        const bestMove = await this.runWorkers(this.map, d, this.history, this.turn);
+        this.isThinking = false;
+        
+        if(!this.autoPlay || this.gameOver || this.isInterrupted) return; 
+        
+        if(bestMove) {
+            this.animateMove(bestMove, () => {
+                setTimeout(() => this.autoNext(), 400); 
+            });
+        } else {
+            this.end("AI 系统判定：无法破局");
         }
     },
 
     getMoves(c, r) {
         const k = this.map[r][c]; if(!k) return [];
         const type = k.toLowerCase(), isRed = k<'a'; const moves = [];
-        const add = (tc, tr) => {
-            if(tc>=0&&tc<9&&tr>=0&&tr<10) {
-                const t = this.map[tr][tc];
-                if(!t || (isRed?t>'Z':t<'a')) {
-                    const saveT = this.map[tr][tc], saveF = this.map[r][c];
-                    this.map[tr][tc] = saveF; this.map[r][c] = 0;
-                    if(Rules.isLegal(this.map, isRed)) moves.push({tc,tr});
-                    this.map[r][c] = saveF; this.map[tr][tc] = saveT;
-                }
+        
+        const addMove = (tc, tr) => {
+            if(tc < 0 || tc > 8 || tr < 0 || tr > 9) return;
+            const target = this.map[tr][tc];
+            if(!target || (isRed ? target>'Z' : target<'a')) {
+                const saveT = this.map[tr][tc], saveF = this.map[r][c];
+                this.map[tr][tc] = saveF; this.map[r][c] = 0;
+                if(RulesUI.isLegal(this.map, isRed)) moves.push({tc,tr});
+                this.map[r][c] = saveF; this.map[tr][tc] = saveT;
             }
         };
+        
         if(type==='p') {
-            const dir=isRed?-1:1; add(c,r+dir);
-            if(isRed?r<=4:r>=5) { add(c-1,r); add(c+1,r); }
+            const dir=isRed?-1:1; addMove(c,r+dir);
+            if(isRed?r<=4:r>=5) { addMove(c-1,r); addMove(c+1,r); }
         } else if(type==='n') {
             [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]].forEach(([dc,dr])=>{
                 const tc=c+dc, tr=r+dr;
                 if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
                      const br = r+(Math.abs(dr)===2?dr/2:0), bc = c+(Math.abs(dc)===2?dc/2:0);
-                     if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) add(tc, tr);
+                     if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) addMove(tc, tr);
                 }
             });
         } else if(type==='r'||type==='c') {
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dc,dr])=>{
+            [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dc,dr])=>{
                 let nc=c+dc, nr=r+dr, jump=false;
                 while(nc>=0&&nc<9&&nr>=0&&nr<10) {
-                    const t=this.map[nr][nc];
-                    if(type==='r') { if(!t) add(nc,nr); else { add(nc,nr); break; } }
-                    else { if(!t && !jump) add(nc,nr); else if(t && !jump) jump=true; else if(t && jump) { add(nc,nr); break; } }
+                    const tg = this.map[nr][nc];
+                    if(type==='r') { if(!tg) addMove(nc,nr); else { addMove(nc,nr); break; } }
+                    else { if(!tg && !jump) addMove(nc,nr); else if(tg && !jump) jump=true; else if(tg && jump) { addMove(nc,nr); break; } }
                     nc+=dc; nr+=dr;
                 }
             });
         } else if(type==='k'||type==='a'||type==='j'||type==='s') {
              [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
                 if((type==='k'||type==='j')&&dc*dr!==0) return; if((type==='a'||type==='s')&&dc*dr===0) return;
-                const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) add(nc,nr);
+                const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) addMove(nc,nr);
              });
+             if(type==='k' || type==='j') {
+                 let nr = r + (isRed ? -1 : 1);
+                 while(nr >= 0 && nr <= 9) {
+                     const tg = this.map[nr][c];
+                     if (tg) { if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); break; }
+                     nr += (isRed ? -1 : 1);
+                 }
+             }
         } else if(type==='b'||type==='x') {
             [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(([dc,dr])=>{
                 const tc=c+dc, tr=r+dr;
                 if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
                     const br=r+dr/2, bc=c+dc/2;
-                    if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) add(tc,tr); }
+                    if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc,tr); }
                 }
             });
         }
@@ -1053,9 +1614,20 @@ const Game = {
     },
 
     click(c, r) {
+        // 🟢 V16 修复：增加防穿梭硬锁拦截
+        if(this.isAnimating) return; 
+        
+        if(this.editMode) {
+            if(this.editPiece === 'clear') this.map[r][c] = 0;
+            else this.map[r][c] = this.editPiece;
+            Sound.play('move'); this.draw(); return;
+        }
+
         this.hintMove = null; 
         const k = this.map[r][c];
-        if(k && k<'a') {
+        const isMyPiece = k && ((this.turn === 'r' && k < 'a') || (this.turn === 'b' && k > 'Z'));
+
+        if(isMyPiece) {
             this.sel = {c, r}; Sound.play('select');
             const hints = this.getMoves(c, r); View.draw(this.map, this.sel, this.last, hints);
             return;
@@ -1065,29 +1637,36 @@ const Game = {
             if(valid) {
                 const saveT = this.map[r][c], saveF = this.map[this.sel.r][this.sel.c];
                 this.map[r][c] = saveF; this.map[this.sel.r][this.sel.c] = 0;
-                const repCount = this.historyKeys.filter(key => key === this.toKey(this.map)).length;
-                const isCheck = !Rules.isLegal(this.map, false); 
+                const kStr = this.map.flat().join('');
+                let repCount = 0;
+                for(let h of this.history) { if (h.flat().join('') === kStr) repCount++; }
+                const isCheck = !RulesUI.isLegal(this.map, this.turn==='b'); 
                 this.map[this.sel.r][this.sel.c] = saveF; this.map[r][c] = saveT; 
 
                 if(repCount >= 2) { 
                     if(isCheck) {
-                        Sound.play('warn'); alert("规则裁定：长将判负！\n连续将军导致三次重复局面，必须变着。"); return; 
+                        Sound.play('warn'); alert("裁决：长将判负！连续将军导致三次重复局面。"); return; 
                     } else {
-                        Sound.play('warn'); this.end("规则裁定：三次重复局面，双方作和！"); return;
+                        Sound.play('warn'); this.end("裁决：三次重复局面，系统判定平局！"); return;
                     }
                 }
 
                 if(!this.gameStarted) this.startGame();
                 
                 this.animateMove({fc:this.sel.c, fr:this.sel.r, tc:c, tr:r}, () => {
-                    setTimeout(()=>this.aiGo(), 50);
+                    if (this.mode === 'h-ai' && !this.gameOver && this.turn === 'b' && !this.autoPlay) {
+                        this.aiGo();
+                    }
                 });
             }
         }
     },
 
     animateMove(m, callback) {
-        if(this.gameOver) return;
+        // 🟢 V16 修复：硬锁拦截连点并发
+        if(this.gameOver || this.isAnimating) return;
+        this.isAnimating = true; 
+        
         const notation = this.getNotation(this.map, m);
         
         this.animPiece = this.map[m.fr][m.fc];
@@ -1096,12 +1675,15 @@ const Game = {
         this.animStart = performance.now();
         
         const frame = (time) => {
-            let p = (time - this.animStart) / 120; 
-            if(p >= 1) {
-                p = 1;
+            let t = (time - this.animStart) / 160; 
+            if(t >= 1) t = 1;
+            let p = 1 - Math.pow(1 - t, 3); 
+            
+            if(t >= 1) {
                 this.map[m.fr][m.fc] = this.animPiece; 
                 this.animPiece = null;
                 this.executeMove(m, notation);
+                this.isAnimating = false; // 🟢 V16 修复：结束释放硬锁
                 if(callback) callback();
             } else {
                 View.draw(this.map, this.sel, this.last, [], {m: this.animM, p: p, piece: this.animPiece});
@@ -1124,52 +1706,80 @@ const Game = {
         
         if(isRedTurn) this.movesCount++;
         
-        const isCheck = !Rules.isLegal(this.map, !isRedTurn);
+        const isCheck = !RulesUI.isLegal(this.map, !isRedTurn);
 
-        let logMsg = `<span style="opacity:0.6">[第${this.movesCount}回合]</span> ` + (isRedTurn ? "🔴 " : "🟢 ") + notation;
+        let logMsg = `<span style="opacity:0.5">[Round ${String(this.movesCount).padStart(3, '0')}]</span> ` + (isRedTurn ? "🔴 " : "🟢 ") + notation;
         if(t) {
-            const names = {'p':'卒','c':'炮','r':'车','n':'马','b':'象','a':'士','k':'将','P':'兵','C':'炮','R':'车','N':'马','B':'相','A':'仕','K':'帅'};
-            logMsg += ` <span class="log-cap">(吃${names[t]||'子'})</span>`;
+            const names = {'p':'卒','c':'砲','r':'車','n':'馬','b':'象','a':'士','k':'將','P':'兵','C':'炮','R':'车','N':'马','B':'相','A':'仕','K':'帅'};
+            logMsg += ` <span class="log-cap">(斩获 ${names[t]||'子'})</span>`;
             if (!isCheck) Sound.play('capture'); 
         }
 
         if(isCheck) {
-            logMsg += ` <span style="color:#ffd60a; font-weight:bold;">(将军!)</span>`;
+            logMsg += ` <span style="color:#ffd60a; font-weight:bold;">[将军报警!]</span>`;
             Sound.play('check');
         } else if (!t) {
             Sound.play('move');
         }
 
         if(t) {
-            const px = View.margin + m.tc * View.grid, py = View.margin + m.tr * View.grid;
+            const px = View.margin + (View.flipped ? 8 - m.tc : m.tc) * View.grid;
+            const py = View.margin + (View.flipped ? 9 - m.tr : m.tr) * View.grid;
             Particles.add(px, py, t < 'a');
         } else {
             this.draw(); 
         }
         
+        let hasMove = false;
+        for(let r=0; r<10; r++) {
+            for(let c=0; c<9; c++) {
+                const p = this.map[r][c];
+                if(p && ((this.turn === 'r' && p < 'a') || (this.turn === 'b' && p > 'Z'))) {
+                    if(this.getMoves(c, r).length > 0) { hasMove = true; break; }
+                }
+            }
+            if(hasMove) break;
+        }
+        
         UI.logHTML(logMsg);
         this.uiUpdate();
-        if(t && (t==='k'||t==='j')) this.end(this.turn==='b'?"红方胜利!":"黑方胜利!");
+        
+        if(!hasMove) {
+            this.end(this.turn === 'r' ? "绝杀无解，黑方胜！" : "绝杀无解，红方胜！");
+            if(this.autoPlay) this.toggleAuto(); 
+        } else if (!this.gameOver && this.mode === 'h-h' && !this.autoPlay) {
+            UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
+        }
     },
 
-    aiGo() {
-        if(this.gameOver) return;
-        UI.status("AI 思考中...", true);
-        const d = document.getElementById('depth').value;
-        this.worker.postMessage({ type:'go', map:this.map, depth:parseInt(d), historyKeys: this.historyKeys });
+    async aiGo() {
+        if(this.gameOver || this.isThinking || this.isAnimating) return;
+        this.isThinking = true;
+        UI.status("底层核心调度中...", true);
+        const d = parseInt(document.getElementById('depth').value);
+        
+        await new Promise(r => setTimeout(r, 50));
+        const bestMove = await this.runWorkers(this.map, d, this.history, this.turn);
+        
+        this.isThinking = false;
+        
+        if(this.gameOver || this.isInterrupted || !bestMove) return; 
+        
+        UI.status("红方走棋", false);
+        this.animateMove(bestMove);
     },
 
     startGame() {
         this.gameStarted = true; this.timers.step = this.LIMIT_STEP; 
         if(this.timers.t) clearInterval(this.timers.t);
         this.timers.t = setInterval(()=>{
-            if(this.gameOver) return;
+            if(this.gameOver || this.editMode || this.isAnimating) return;
             this.timers.step--; 
             if(this.turn==='r') this.timers.r--; else this.timers.b--;
 
-            if(this.timers.step <= 0) { this.end(this.turn==='r' ? "红方超时(步时)判负" : "AI超时(步时)判负"); return; }
+            if(this.timers.step <= 0) { this.end(this.turn==='r' ? "红方超时(步时)判负" : (this.mode==='h-ai'?"AI超时(步时)判负":"黑方超时(步时)判负")); return; }
             if(this.timers.r <= 0) this.end("红方局时耗尽判负");
-            if(this.timers.b <= 0) this.end("AI局时耗尽判负");
+            if(this.timers.b <= 0) this.end(this.mode==='h-ai'?"AI局时耗尽判负":"黑方局时耗尽判负");
 
             this.uiUpdate();
         }, 1000);
@@ -1177,21 +1787,41 @@ const Game = {
 
     end(msg) {
         this.gameOver = true; clearInterval(this.timers.t);
-        Sound.play(msg.includes('获胜')||msg.includes('胜利')?'win':'lose');
+        Sound.play(msg.includes('获胜')||msg.includes('胜')?'win':'lose');
         setTimeout(()=>alert(msg), 100); UI.status(msg, false);
     },
 
     undo() {
-        if(this.history.length<2 || this.turn!=='r' || this.gameOver) return;
-        this.history.pop(); this.map = this.history.pop();
-        this.historyKeys.pop(); this.historyKeys.pop(); 
-        this.movesCount--;
-        this.turn = 'r'; this.last = null; this.timers.step = this.LIMIT_STEP; 
-        Sound.play('select'); this.draw(); UI.log("已悔棋", "warn");
+        // 🟢 V16 修复：增加防穿梭硬锁拦截
+        if(this.gameOver || this.editMode || this.isAnimating) return;
+        this.resetWorkers(); 
+        this.isThinking = false; 
+        
+        if(this.mode === 'h-ai') {
+            if(this.history.length < 2 || this.turn !== 'r') return;
+            this.history.pop(); this.map = this.history.pop();
+            this.historyKeys.pop(); this.historyKeys.pop(); 
+            this.movesCount--;
+            this.turn = 'r';
+        } else {
+            if(this.history.length < 1) return;
+            this.map = this.history.pop();
+            this.historyKeys.pop();
+            if(this.turn === 'r') this.movesCount--;
+            this.turn = this.turn === 'r' ? 'b' : 'r';
+        }
+        
+        this.last = null; this.timers.step = this.LIMIT_STEP; 
+        Sound.play('select'); this.draw(); UI.log("已强行阻断 AI，进行时空回溯", "warn");
         this.uiUpdate();
+        UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
     },
 
-    restart() { clearInterval(this.timers.t); Sound.play('select'); this.init(); },
+    restart() { 
+        if(this.editMode) this.toggleEdit(); 
+        if(this.autoPlay) this.toggleAuto();
+        clearInterval(this.timers.t); Sound.play('select'); this.init(); 
+    },
 
     uiUpdate() {
         const fmt = s => `${String(Math.floor(Math.max(0, s)/60)).padStart(2,'0')}:${String(Math.max(0, s)%60).padStart(2,'0')}`;
@@ -1200,7 +1830,7 @@ const Game = {
 
         if(tr) tr.innerText = fmt(this.timers.r); if(tb) tb.innerText = fmt(this.timers.b);
         
-        const stepTxt = `剩余 ${this.timers.step}s`, isUrgent = this.timers.step < 15;
+        const stepTxt = `REST ${this.timers.step}s`, isUrgent = this.timers.step < 15;
 
         if(sr) { sr.innerText = this.turn==='r' && this.gameStarted ? stepTxt : ''; sr.className = isUrgent && this.turn==='r' ? 'step-timer urgent' : 'step-timer'; }
         if(sb) { sb.innerText = this.turn==='b' && this.gameStarted ? stepTxt : ''; sb.className = isUrgent && this.turn==='b' ? 'step-timer urgent' : 'step-timer'; }
@@ -1210,33 +1840,38 @@ const Game = {
 
         const score = this.evaluate();
         let displayScore = score;
-        let text = displayScore > 20 ? `红领先 ${displayScore}` : (displayScore < -20 ? `黑领先 ${-displayScore}` : '势均力敌');
+        let text = displayScore > 20 ? `🔴 红方优 +${displayScore}` : (displayScore < -20 ? `黑方优 +${-displayScore} 🟢` : '势均力敌');
         let winPct = 50 + (displayScore / 30); 
         winPct = Math.max(5, Math.min(95, winPct)); 
         
         const sbBar = document.getElementById('scoreBar');
         if(sbBar) sbBar.style.width = winPct + '%';
         const st = document.getElementById('scoreText');
-        if(st) st.innerText = text;
+        if(st) {
+            st.innerText = text;
+            st.style.color = displayScore > 20 ? "var(--red)" : (displayScore < -20 ? "var(--black)" : "#fff");
+        }
     }
 };
 
 const UI = {
     log(s, type='') {
         const b = document.getElementById('log');
-        while(b.children.length >= 15) b.removeChild(b.firstElementChild); 
+        while(b.children.length >= 30) b.removeChild(b.firstElementChild); 
         const d = document.createElement('div'); 
         d.className = type ? `log-line ${type}` : 'log-line'; 
         d.innerText = `> ${s}`;
-        b.appendChild(d); b.scrollTop = b.scrollHeight;
+        b.appendChild(d); 
+        b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' });
     },
     logHTML(htmlStr) {
         const b = document.getElementById('log');
-        while(b.children.length >= 15) b.removeChild(b.firstElementChild);
+        while(b.children.length >= 30) b.removeChild(b.firstElementChild);
         const d = document.createElement('div'); 
         d.className = 'log-line'; 
         d.innerHTML = htmlStr;
-        b.appendChild(d); b.scrollTop = b.scrollHeight;
+        b.appendChild(d); 
+        b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' });
     },
     status(s, busy) {
         const t = document.getElementById('statusText'), d = document.getElementById('statusDot');
