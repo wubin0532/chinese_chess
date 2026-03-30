@@ -1,4 +1,4 @@
-# ♟️ Chinese Chess Pro - V41 (云边协同修罗版)
+# ♟️ Chinese Chess Pro - V41 (单文件版)
 
 [![Vanilla JS](https://img.shields.io/badge/JavaScript-Vanilla-f7df1e?logo=javascript&logoColor=black)](#)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-success)](#)
@@ -46,7 +46,7 @@
 本项目为完全独立的 HTML 单文件，**无任何 NPM 依赖，无需构建打包**。
 
 1. 克隆或下载本仓库。
-2. 双击打开 `chinese_chess.html` 即可在本地浏览器中运行体验（默认单核降级模式）。
+2. 双击打开 `ChineseChess.html` 即可在本地浏览器、手机、Pad中运行体验（默认单核降级模式）。
 3. **⚠️ 性能解锁指南 (解锁 100MB 共享内存)**：
    由于现代浏览器的安全策略，要激活 `SharedArrayBuffer` 实现 6 核并发性能全开，必须在具有跨域隔离 (Cross-Origin Isolation) 的本地服务器上运行。
    
