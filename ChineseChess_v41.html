@@ -1,0 +1,2365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>中国象棋 Pro17 - V41 极简降噪版</title>
+    <style>
+        /* ================= CSS 核心全局变量与布局 ================= */
+        :root { --bg: #18181a; --panel: #222225; --text: #e0e0e0; --accent: #0a84ff; --red: #ff453a; --black: #30d158; --border: rgba(255,255,255,0.08); }
+        
+        body { 
+            margin: 0; background-color: var(--bg); color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; 
+            height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; 
+            user-select: none; -webkit-font-smoothing: antialiased; touch-action: manipulation; 
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            box-sizing: border-box;
+        }
+        
+        .header { height: 50px; background: rgba(30, 30, 32, 0.95); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 16px; font-weight: 700; flex-shrink: 0; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 110; backdrop-filter: blur(10px); }
+        .header-subtitle { font-size: 11px; opacity: 0.5; font-weight: normal; font-family: "SF Mono", Consolas, monospace; letter-spacing: 1px; }
+
+        .mobile-menu-btn { display: none; background: none; border: none; color: var(--text); cursor: pointer; padding: 8px; margin-right: -8px; border-radius: 8px; transition: background 0.2s; }
+        .mobile-menu-btn:active { background: rgba(255,255,255,0.1); }
+        .mobile-menu-btn svg { width: 24px; height: 24px; }
+
+        .main-layout { flex: 1; display: flex; padding: 24px; gap: 24px; height: calc(100% - 50px); box-sizing: border-box; align-items: center; justify-content: center; position: relative; }
+        
+        .board-wrap { height: 100%; width: auto; aspect-ratio: 10.4/11.4; background: #262626; border-radius: 16px; box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; border: 1px solid rgba(255,255,255,0.05); position: relative; max-width: 100%; transition: background 0.4s ease; overflow: hidden; z-index: 10; }
+        canvas { border-radius: 12px; width: 100%; height: 100%; display: block; touch-action: none; }
+        
+        .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .sidebar { width: 340px; height: 100%; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; z-index: 100; overflow: hidden; }
+        .panel { background: linear-gradient(145deg, #262629, #1f1f21); border-radius: 14px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; display: flex; flex-direction: column; flex-shrink: 0; }
+        .panel-title { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+
+        .status-badge { display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; margin-right: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        .dot.thinking { background: #ffd60a; box-shadow: 0 0 10px #ffd60a, inset 0 1px 2px rgba(255,255,255,0.8); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+        
+        .timer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+        .t-cell { background: rgba(0,0,0,0.4); padding: 16px 8px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.03); transition: 0.3s; position: relative; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); }
+        .t-cell.active { background: rgba(255,255,255,0.06); border-color: var(--accent); box-shadow: 0 0 20px rgba(10, 132, 255, 0.15), inset 0 2px 8px rgba(0,0,0,0.5); }
+        .t-val { display: block; font-family: "SF Mono", Consolas, monospace; font-size: 24px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
+        .t-lbl { font-size: 11px; color: #888; margin-top: 6px; letter-spacing: 0.5px; }
+        .step-timer { margin-top: 8px; font-size: 12px; color: #ffd60a; font-family: "SF Mono", Consolas, monospace; height: 14px; transition: color 0.3s; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .step-timer.urgent { color: #ff453a; font-weight: bold; animation: urgent-pulse 0.5s infinite alternate; text-shadow: 0 0 10px rgba(255,69,58,0.6); }
+
+        .score-wrap { background: rgba(0,0,0,0.4); padding: 16px; border-radius: 10px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.03); }
+        .score-labels { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; font-weight: 600; color: #aaa; }
+        .score-bar-bg { height: 8px; background: var(--black); border-radius: 4px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); }
+        .score-bar-fill { height: 100%; background: var(--red); width: 50%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 2px 0 5px rgba(0,0,0,0.5); }
+
+        /* 🟢 V41 新增：设置折叠面板样式 */
+        .settings-details { background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 14px; }
+        .settings-details summary { padding: 10px 12px; font-size: 12px; font-weight: 600; color: #aaa; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+        .settings-details summary::-webkit-details-marker { display: none; }
+        .settings-details summary::after { content: '▼'; font-size: 10px; transition: transform 0.2s; }
+        .settings-details[open] summary::after { transform: rotate(180deg); }
+        .settings-details[open] summary { border-bottom: 1px dashed rgba(255,255,255,0.05); }
+        .settings-details .settings-grid { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0; }
+        
+        .setting-item { display: flex; flex-direction: column; gap: 8px; }
+        .settings-grid label { font-size: 11px; color: #888; font-weight: 600; }
+        select { width: 100%; background: linear-gradient(180deg, #2a2a2c 0%, #1e1e20 100%); color: #ddd; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        select:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+
+        .btn-row { display: flex; gap: 12px; margin-bottom: 12px; }
+        .btn-row:last-child { margin-bottom: 0; }
+        button { flex: 1; padding: 12px 0; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3), inset 0 1px 1px rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; gap: 6px; letter-spacing: 0.5px; }
+        button:hover { filter: brightness(1.15); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(10, 132, 255, 0.4), inset 0 1px 1px rgba(255,255,255,0.2); }
+        button:active { transform: scale(0.96) translateY(1px); box-shadow: 0 2px 5px rgba(10, 132, 255, 0.4); }
+        
+        button.sec { background: linear-gradient(180deg, #333336 0%, #262629 100%); border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 10px rgba(0,0,0,0.3); color: #ccc; }
+        button.sec:hover { color: #fff; border-color: rgba(255,255,255,0.15); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+        button.sec.active-toggle { background: linear-gradient(135deg, #1e8449, #155730); color: #fff; border-color: #30d158; box-shadow: 0 4px 12px rgba(48, 209, 88, 0.3); }
+
+        button.highlight { background: linear-gradient(135deg, #ff9f0a 0%, #ff453a 100%); box-shadow: 0 4px 12px rgba(255, 69, 58, 0.3), inset 0 1px 1px rgba(255,255,255,0.3); text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        button.highlight:hover { box-shadow: 0 6px 18px rgba(255, 69, 58, 0.5); }
+
+        /* 🟢 V41 改进：系统日志紧凑单行样式 */
+        .log-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-bottom: 0; }
+        .log-box { flex: 1; background: rgba(10, 12, 15, 0.6); border-radius: 10px; padding: 12px; font-family: "SF Mono", Consolas, monospace; font-size: 13px; color: #a1c9f7; overflow-y: auto; border: 1px solid rgba(10, 132, 255, 0.15); box-shadow: inset 0 5px 15px rgba(0,0,0,0.8); scroll-behavior: smooth; margin-bottom: 4px; }
+        .log-box::-webkit-scrollbar { width: 5px; }
+        .log-box::-webkit-scrollbar-thumb { background: rgba(10, 132, 255, 0.3); border-radius: 3px; }
+        .log-line { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed rgba(255,255,255,0.05); white-space: pre-wrap; word-break: break-all; line-height: 1.4; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+        .log-line:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .log-line.warn { color: #ff9f0a; }
+        .log-line.sys { color: #30d158; opacity: 0.9; }
+
+        .edit-overlay { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90vw; max-width: 420px; background: rgba(30,30,32,0.95); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px; display: none; flex-direction: column; z-index: 200; box-shadow: 0 20px 50px rgba(0,0,0,0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+        .edit-title { color: #fff; font-size: 16px; font-weight: 700; margin-bottom: 16px; text-align: center; letter-spacing: 2px; }
+        .palette { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .p-piece { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(145deg, #e6e6e6, #b0b0b0); display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 20px; cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.2); transition: all 0.2s; }
+        .p-piece:hover { transform: translateY(-2px) scale(1.05); }
+        .p-piece.red { color: #c00; font-family: "STKaiti", "Kaiti SC", "Kaiti", serif; }
+        .p-piece.blk { color: #1e8449; font-family: "STKaiti", "Kaiti SC", "Kaiti", serif; }
+        .p-piece.sel { border-color: var(--accent); transform: scale(1.15) translateY(-2px); box-shadow: 0 0 20px rgba(10,132,255,0.6); }
+        .p-clear { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(145deg, #ff5a50, #d03020); display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; color: #fff; cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: all 0.2s; }
+        .p-clear.sel { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 20px rgba(255,69,58,0.6); }
+
+        @media (max-width: 900px) { 
+            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+            .header-subtitle { display: none; }
+            .main-layout { flex-direction: column; padding: 12px; align-items: center; height: calc(100vh - 50px); overflow: hidden; }
+            .board-wrap { width: 100%; aspect-ratio: 10.4/11.4; max-height: calc(100vh - 80px); flex: none; border-radius: 8px; margin: auto 0; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+            
+            .sidebar { 
+                position: fixed; top: 0; right: -100%; bottom: 0; width: 320px; max-width: 85vw; height: auto;
+                background: rgba(24, 24, 26, 0.98); z-index: 105; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
+                box-sizing: border-box; overflow-y: auto; box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+            }
+            .sidebar.active { right: 0; }
+            .log-panel { min-height: 250px; flex-shrink: 0; }
+        }
+        
+        @media (max-height: 600px) and (orientation: landscape) {
+            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+            .header-subtitle { display: none; }
+            .main-layout { flex-direction: row; padding: 12px; height: calc(100vh - 50px); overflow: hidden; }
+            .board-wrap { height: 100%; max-height: 100%; width: auto; aspect-ratio: 10.4/11.4; flex: none; border-radius: 8px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+            
+            .sidebar { 
+                position: fixed; top: 0; right: -100%; bottom: 0; width: 320px; max-width: 85vw; height: auto;
+                background: rgba(24, 24, 26, 0.98); z-index: 105; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
+                box-sizing: border-box; overflow-y: auto; box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+            }
+            .sidebar.active { right: 0; }
+            .log-panel { min-height: 200px; flex-shrink: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <span>CHINESE CHESS <span style="color:var(--accent)">PRO V41</span></span>
+    <span class="header-subtitle">极简降噪 · 云边协同修罗版</span>
+    <button class="mobile-menu-btn" onclick="Game.toggleMenu()" title="控制台">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="Game.toggleMenu()"></div>
+
+<div class="main-layout">
+    <div class="board-wrap" id="boardContainer">
+        <canvas id="board"></canvas>
+    </div>
+    
+    <div class="sidebar" id="appSidebar">
+        <div class="panel">
+            <div class="panel-title">
+                <span>TACTICAL STATUS</span>
+                <div class="status-badge">
+                    <span class="dot" id="statusDot"></span>
+                    <span id="statusText" style="font-size:12px; font-weight:bold; color:#ddd;">等待开局</span>
+                </div>
+            </div>
+            
+            <div class="timer-grid">
+                <div class="t-cell" id="cellR">
+                    <span class="t-val" style="color:var(--red)" id="timeR">15:00</span>
+                    <span class="t-lbl">红方局时</span>
+                    <div class="step-timer" id="stepR"></div>
+                </div>
+                <div class="t-cell" id="cellB">
+                    <span class="t-val" style="color:var(--black)" id="timeB">15:00</span>
+                    <span class="t-lbl">黑方局时</span>
+                    <div class="step-timer" id="stepB"></div>
+                </div>
+            </div>
+
+            <div class="score-wrap">
+                <div class="score-labels">
+                    <span>🔴 RED</span>
+                    <span id="scoreText" style="color:#fff; font-size:13px; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">势均力敌</span>
+                    <span>BLK 🟢</span>
+                </div>
+                <div class="score-bar-bg">
+                    <div class="score-bar-fill" id="scoreBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" style="padding-bottom: 14px; flex-shrink: 0;">
+            <div class="panel-title"><span>COMMAND CENTER</span></div>
+            
+            <details class="settings-details">
+                <summary>⚙️ 引擎与偏好设置</summary>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label>对战模式</label>
+                        <select id="gameMode" onchange="Game.changeMode()">
+                            <option value="h-ai" selected>单机 (AI执黑)</option>
+                            <option value="h-h">双人对弈</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>棋盘皮肤</label>
+                        <select id="themeSelect" onchange="View.setTheme(this.value)">
+                            <option value="classic">极客原色</option>
+                            <option value="wood" selected>紫檀木纹</option>
+                            <option value="green">清新石绿</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>思考时间</label>
+                        <select id="depth">
+                            <option value="1000">1秒 (极速)</option>
+                            <option value="3000">3秒 (标准)</option>
+                            <option value="5000" selected>5秒 (强力)</option>
+                            <option value="10000">10秒 (深算)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>让子模式</label>
+                        <select id="handicap" onchange="Game.restart()">
+                            <option value="0" selected>公平对决</option>
+                            <option value="1">让左马</option>
+                            <option value="2">让双马</option>
+                            <option value="3">让双车</option>
+                        </select>
+                    </div>
+                </div>
+            </details>
+            
+            <div class="btn-row">
+                <button class="sec" onclick="Game.restart()">🔄 重置</button>
+                <button class="sec" onclick="Game.undo()">↩️ 悔棋</button>
+                <button class="highlight" onclick="Game.hint()">💡 预测</button>
+            </div>
+            <div class="btn-row">
+                <button class="sec" onclick="Game.toggleEdit()">⚙️ 摆局</button>
+                <button class="sec" onclick="Game.flipBoard()">🔃 翻转</button>
+                <button class="sec" id="soundBtn" onclick="Game.toggleSound()">🔊 音效</button>
+                <button class="sec" id="autoBtn" onclick="Game.toggleAuto()">▶️ 托管</button>
+            </div>
+        </div>
+
+        <div class="panel log-panel">
+            <div class="panel-title" style="margin-bottom:8px;"><span>SYSTEM LOG</span></div>
+            <div class="log-box" id="log"></div>
+        </div>
+    </div>
+</div>
+
+<div id="editOverlay" class="edit-overlay">
+    <div class="edit-title">CREATIVE MODE</div>
+    <div class="palette" id="paletteBox">
+        <div class="p-piece red sel" onclick="Game.selEdit('K', this)">帅</div>
+        <div class="p-piece red" onclick="Game.selEdit('A', this)">仕</div>
+        <div class="p-piece red" onclick="Game.selEdit('B', this)">相</div>
+        <div class="p-piece red" onclick="Game.selEdit('N', this)">马</div>
+        <div class="p-piece red" onclick="Game.selEdit('R', this)">车</div>
+        <div class="p-piece red" onclick="Game.selEdit('C', this)">炮</div>
+        <div class="p-piece red" onclick="Game.selEdit('P', this)">兵</div>
+        <div class="p-piece blk" onclick="Game.selEdit('k', this)">將</div>
+        <div class="p-piece blk" onclick="Game.selEdit('a', this)">士</div>
+        <div class="p-piece blk" onclick="Game.selEdit('b', this)">象</div>
+        <div class="p-piece blk" onclick="Game.selEdit('n', this)">馬</div>
+        <div class="p-piece blk" onclick="Game.selEdit('r', this)">車</div>
+        <div class="p-piece blk" onclick="Game.selEdit('c', this)">砲</div>
+        <div class="p-piece blk" onclick="Game.selEdit('p', this)">卒</div>
+        <div class="p-clear" onclick="Game.selEdit('clear', this)">擦</div>
+    </div>
+    <div style="display: flex; gap: 12px; width: 100%;">
+        <button style="background:#30d158; font-size:14px;" onclick="Game.finishEdit()">✅ 完成配置开局</button>
+        <button class="sec" style="flex:0.5;" onclick="Game.clearBoard()">🗑️ 清空</button>
+    </div>
+</div>
+
+<script id="worker-code" type="javascript/worker">
+    const Rules = {
+        isLegal(map, myColorIsRed) {
+            let rK = null, bK = null;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                if(map[r][c] === 'K') rK = {c, r};
+                if(map[r][c] === 'k') bK = {c, r};
+            }
+            if(!rK || !bK) return true; 
+            if(rK.c === bK.c) {
+                let count = 0;
+                const minR = Math.min(rK.r, bK.r);
+                const maxR = Math.max(rK.r, bK.r);
+                for(let r = minR + 1; r < maxR; r++) { if(map[r][rK.c]) count++; }
+                if(count === 0) return false; 
+            }
+            const myKing = myColorIsRed ? rK : bK;
+            const enemyColorLower = myColorIsRed;
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            for(let d of dirs) {
+                let jump = false, c = myKing.c + d[0], r = myKing.r + d[1];
+                while(c>=0 && c<9 && r>=0 && r<10) {
+                    const p = map[r][c];
+                    if(p) {
+                        const type = p.toLowerCase();
+                        const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                        if(isEnemy) {
+                            if(!jump) {
+                                if(type === 'r' || type === 'k') return false; 
+                                if(type === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
+                                    if(enemyColorLower && r > myKing.r) {} else if(!enemyColorLower && r < myKing.r) {} else return false; 
+                                }
+                            } else { if(type === 'c') return false; }
+                        }
+                        if(p) { if(jump) break; jump = true; } 
+                    }
+                    c += d[0]; r += d[1];
+                }
+            }
+            const knights = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+            for(let k of knights) {
+                const c = myKing.c + k[0], r = myKing.r + k[1];
+                if(c>=0 && c<9 && r>=0 && r<10) {
+                    const p = map[r][c];
+                    if(p) {
+                        const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                        if(isEnemy && p.toLowerCase() === 'n') {
+                            const legC = Math.abs(k[0]) === 2 ? myKing.c + k[0]/2 : c;
+                            const legR = Math.abs(k[1]) === 2 ? myKing.r + k[1]/2 : r;
+                            if(legR>=0 && legR<10 && legC>=0 && legC<9) { 
+                                if(!map[legR][legC]) return false; 
+                            }
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+    };
+
+    const C = {
+        vals: { 'k':10000, 'c':450, 'n':400, 'r':900, 'b':200, 'a':200, 'p':100, 'K':10000, 'C':450, 'N':400, 'R':900, 'B':200, 'A':200, 'P':100 },
+        pst: { 
+            p: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[10,0,20,0,20,0,20,0,10],[20,20,30,40,50,40,30,20,20],[30,30,40,50,60,50,40,30,30],[30,30,40,50,60,50,40,30,30],[0,0,0,0,0,0,0,0,0]],
+            r: [[0,0,0,0,0,0,0,0,0],[-2,10,5,10,10,10,5,10,-2],[0,0,5,0,0,0,5,0,0],[0,0,5,0,0,0,5,0,0],[0,4,8,12,15,12,8,4,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[2,6,8,10,12,10,8,6,2],[2,6,8,10,12,10,8,6,2]],
+            n: [[-20,-20,-10,  0,  0,  0,-10,-20,-20],[ -2,  0,  2,  4,  4,  4,  2,  0, -2],[  0,  2,  4,  6,  8,  6,  4,  2,  0],[  0,  4,  6,  8,  8,  8,  6,  4,  0],[  0,  4,  6,  8,  8,  8,  6,  4,  0],[  0,  4,  6,  8, 10,  8,  6,  4,  0],[  0,  4,  6,  8, 10,  8,  6,  4,  0],[  0,  2,  4,  6,  8,  6,  4,  2,  0],[ -2,  0,  2,  4,  4,  4,  2,  0, -2],[-20,-20,-10,  0,  0,  0,-10,-20,-20]],
+            c: [[-20,-20,-20,-20,-20,-20,-20,-20,-20],[ -5, -5, -2, -2, -2, -2, -2, -5, -5],[  2,  2,  4,  6,  8,  6,  4,  2,  2],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  1,  2,  4,  2,  1,  0,  0],[  1,  1,  4,  5,  6,  5,  4,  1,  1],[  0,  1,  2,  3,  3,  3,  2,  1,  0],[  0,  0,  1,  2,  2,  2,  1,  0,  0]],
+            a: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,20,0,20,0,0,0],[0,0,0,0,30,0,0,0,0],[0,0,0,10,0,10,0,0,0]],
+            b: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,20,0,0,0,20,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,30,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,10,0,0,0,10,0,0]]
+        }
+    };
+    C.pst.m = C.pst.a; C.pst.x = C.pst.b; 
+
+    const Zobrist = {
+        table: new BigInt64Array(14 * 10 * 9),
+        key: 0n,
+        pieceMap: { 'k':0, 'a':1, 'b':2, 'n':3, 'r':4, 'c':5, 'p':6, 'K':7, 'A':8, 'B':9, 'N':10, 'R':11, 'C':12, 'P':13 },
+        init() { 
+            let seed = 20260329; 
+            const seededRandom = () => {
+                seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+                return (seed >>> 0) / 4294967296;
+            };
+            for(let i=0; i<this.table.length; i++) {
+                const h = BigInt(Math.floor(seededRandom() * 0xFFFFFFFF));
+                const l = BigInt(Math.floor(seededRandom() * 0xFFFFFFFF));
+                this.table[i] = (h << 32n) | l;
+            }
+        },
+        computeFull(map) {
+            this.key = 0n;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) if(map[r][c]) this.toggle(map[r][c], r, c);
+            return this.key;
+        },
+        toggle(piece, r, c) {
+            const pIdx = this.pieceMap[piece];
+            if (pIdx !== undefined) this.key ^= this.table[pIdx * 90 + r * 9 + c];
+        }
+    };
+    Zobrist.init();
+
+    let TT = {
+        isInitialized: false,
+        isShared: false,
+        init(buffer) {
+            this.isInitialized = true;
+            if (buffer) {
+                this.isShared = true;
+                this.keysXor = new BigInt64Array(buffer, 0, 8388608);
+                this.payloads = new Int32Array(buffer, 67108864, 8388608); 
+            } else {
+                this.isShared = false;
+                this.table = new Array(1048576);
+            }
+        },
+        store(key, depth, val, flag, isMax) {
+            if (val > 20000) val = 20000;
+            if (val < -20000) val = -20000;
+
+            if (this.isShared) {
+                const idx = Number(key & 8388607n);
+                const payload = (val & 0xFFFF) | ((depth & 0xFF) << 16) | ((flag & 0x3) << 24) | ((isMax ? 1 : 0) << 26);
+                
+                const existingPayload = this.payloads[idx];
+                const existingDepth = (existingPayload >> 16) & 0xFF;
+                
+                if (this.keysXor[idx] !== (key ^ BigInt(existingPayload)) || depth >= existingDepth) {
+                    this.keysXor[idx] = key ^ BigInt(payload);
+                    this.payloads[idx] = payload;
+                }
+            } else {
+                const idx = Number(key & 1048575n);
+                const entry = this.table[idx];
+                if (!entry || entry.key !== key || depth >= entry.d) {
+                    this.table[idx] = { key, d: depth, v: val, f: flag, m: isMax };
+                }
+            }
+        },
+        probe(key, depth, alpha, beta, isMax) {
+            if (this.isShared) {
+                const idx = Number(key & 8388607n);
+                const p = this.payloads[idx];
+                const k = this.keysXor[idx];
+                
+                if (k === (key ^ BigInt(p))) {
+                    const d = (p >> 16) & 0xFF;
+                    const isM = ((p >> 26) & 0x1) === 1;
+                    if (d >= depth && isM === isMax) {
+                        const f = (p >> 24) & 0x3;
+                        const v = (p << 16) >> 16; 
+                        if (f === 0) return v;
+                        if (f === 1 && v <= alpha) return v;
+                        if (f === 2 && v >= beta) return v;
+                    }
+                }
+                return null;
+            } else {
+                const idx = Number(key & 1048575n);
+                const entry = this.table[idx];
+                if(entry && entry.key === key && entry.d >= depth && entry.m === isMax) {
+                    if(entry.f === 0) return entry.v; 
+                    if(entry.f === 1 && entry.v <= alpha) return entry.v; 
+                    if(entry.f === 2 && entry.v >= beta) return entry.v; 
+                }
+                return null;
+            }
+        },
+        clear() {
+            if (!this.isShared) this.table = new Array(1048576);
+        }
+    };
+
+    const Engine = {
+        historyTable: null, killers: null, path: new BigInt64Array(1000), 
+        val_c: 450, val_n: 400, phaseMat: 12,
+        startTime: 0, timeLimit: 0, abortSearch: false, nodes: 0,
+
+        checkTime() {
+            if ((++this.nodes & 2047) === 0) {
+                if (Date.now() - this.startTime > this.timeLimit) {
+                    this.abortSearch = true;
+                }
+            }
+        },
+
+        sqAttacked(map, c, r, byRed) {
+            if (byRed) {
+                if (r+1 <= 9 && map[r+1][c] === 'P') return true;
+                if (r <= 4) {
+                    if (c-1 >= 0 && map[r][c-1] === 'P') return true;
+                    if (c+1 <= 8 && map[r][c+1] === 'P') return true;
+                }
+            } else {
+                if (r-1 >= 0 && map[r-1][c] === 'p') return true;
+                if (r >= 5) {
+                    if (c-1 >= 0 && map[r][c-1] === 'p') return true;
+                    if (c+1 <= 8 && map[r][c+1] === 'p') return true;
+                }
+            }
+            const kn = byRed ? 'N' : 'n';
+            const knMoves = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+            for(let d of knMoves) {
+                let nc = c + d[0], nr = r + d[1];
+                if(nc>=0 && nc<=8 && nr>=0 && nr<=9 && map[nr][nc] === kn) {
+                    let legC = nc + (Math.abs(d[0])===2 ? -d[0]/2 : 0);
+                    let legR = nr + (Math.abs(d[1])===2 ? -d[1]/2 : 0);
+                    if (!map[legR][legC]) return true;
+                }
+            }
+            const rk = byRed ? 'R' : 'r';
+            const cn = byRed ? 'C' : 'c';
+            const kng = byRed ? 'K' : 'k';
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            for (let d of dirs) {
+                let nc = c + d[0], nr = r + d[1];
+                let jump = false;
+                while(nc>=0 && nc<=8 && nr>=0 && nr<=9) {
+                    let p = map[nr][nc];
+                    if (p) {
+                        if (!jump) {
+                            if (p === rk || p === kng) return true;
+                            jump = true;
+                        } else {
+                            if (p === cn) return true;
+                            break;
+                        }
+                    }
+                    nc += d[0]; nr += d[1];
+                }
+            }
+            return false;
+        },
+
+        eval(map) {
+            let s = 0;
+            let rKing = null, bKing = null;
+            let rA = 0, rE = 0, bA = 0, bE = 0;
+
+            for(let r=0; r<10; r++) {
+                for(let c=0; c<9; c++) {
+                    const k = map[r][c];
+                    if(!k) continue;
+                    const t = k.toLowerCase(), isRed = k<'a';
+                    let v = 0;
+                    if(t==='c') v = this.val_c; else if(t==='n') v = this.val_n; else v = C.vals[t] || 0;
+                    
+                    if(C.pst[t]) { 
+                        const row = C.pst[t][isRed ? 9-r : r]; 
+                        if(row) v += row[c] || 0; 
+                    }
+                    s += isRed ? v : -v; 
+
+                    if (k === 'K') rKing = {r, c}; else if (k === 'k') bKing = {r, c};
+                    else if (k === 'A' || k === 'S') rA++; else if (k === 'B' || k === 'X') rE++;
+                    else if (k === 'a' || k === 's') bA++; else if (k === 'b' || k === 'x') bE++;
+                }
+            }
+
+            if (rA < 2) s -= (2 - rA) * 60; if (rE < 2) s -= (2 - rE) * 50; 
+            if (bA < 2) s += (2 - bA) * 60; if (bE < 2) s += (2 - bE) * 50; 
+
+            for(let r=0; r<10; r++) {
+                for(let c=0; c<9; c++) {
+                    const k = map[r][c];
+                    if(!k) continue;
+                    const isRed = k<'a';
+                    const t = k.toLowerCase();
+
+                    let mobility = 0, threat = 0;
+
+                    if (t === 'r') {
+                        let count = 0;
+                        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                        for(let i=0; i<4; i++) {
+                            let nc = c + dirs[i][0], nr = r + dirs[i][1];
+                            while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                                if(!map[nr] || !map[nr][nc]) count++; else break;
+                                nc += dirs[i][0]; nr += dirs[i][1];
+                            }
+                        }
+                        mobility = count * 2; 
+                        
+                        let isOpen = true;
+                        const rDir = isRed ? 1 : -1;
+                        for(let nr = r + rDir; nr >= 0 && nr < 10; nr += rDir) {
+                            const p = map[nr] && map[nr][c];
+                            if(p) { if(p.toLowerCase() === 'p' && (p < 'a') === isRed) isOpen = false; break; }
+                        }
+                        if(isOpen) mobility += 25;
+                        
+                        const eKing = isRed ? bKing : rKing;
+                        if (eKing) {
+                            if (c === eKing.c) { 
+                                let pb = 0;
+                                for(let i=Math.min(r, eKing.r)+1; i<Math.max(r, eKing.r); i++) if(map[i] && map[i][c]) pb++;
+                                if (pb === 0) threat += (isOpen ? 80 : 50); else if (pb === 1) threat += 20;
+                            }
+                            if (r === eKing.r) { 
+                                let pb = 0;
+                                for(let i=Math.min(c, eKing.c)+1; i<Math.max(c, eKing.c); i++) if(map[r] && map[r][i]) pb++;
+                                if (pb === 0) threat += (isOpen ? 80 : 50); else if (pb === 1) threat += 20;
+                            }
+                        }
+
+                    } else if (t === 'c') {
+                        let count = 0;
+                        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                        for(let i=0; i<4; i++) {
+                            let nc = c + dirs[i][0], nr = r + dirs[i][1];
+                            while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                                if(!map[nr] || !map[nr][nc]) count++; else break;
+                                nc += dirs[i][0]; nr += dirs[i][1];
+                            }
+                        }
+                        mobility = count * 5; 
+
+                        const eKing = isRed ? bKing : rKing;
+                        if (eKing) {
+                            if (c === eKing.c) { 
+                                let pb = 0;
+                                for(let i=Math.min(r, eKing.r)+1; i<Math.max(r, eKing.r); i++) if(map[i] && map[i][c]) pb++;
+                                if (pb === 1) threat += 100; else if (pb === 2) threat += 50; 
+                            }
+                            if (r === eKing.r) { 
+                                let pb = 0;
+                                for(let i=Math.min(c, eKing.c)+1; i<Math.max(c, eKing.c); i++) if(map[r] && map[r][i]) pb++;
+                                if (pb === 1) threat += 100; else if (pb === 2) threat += 50; 
+                            }
+                        }
+
+                    } else if (t === 'n') {
+                        let count = 0, blocked = 0;
+                        const moves = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+                        for(let i=0; i<8; i++) {
+                            const d = moves[i];
+                            const tc = c + d[0], tr = r + d[1];
+                            if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
+                                const legC = c + (Math.abs(d[0])===2 ? d[0]/2 : 0);
+                                const legR = r + (Math.abs(d[1])===2 ? d[1]/2 : 0);
+                                if(map[legR]) { if(!map[legR][legC]) count++; else blocked++; }
+                            }
+                        }
+                        mobility = (count * 4) - (blocked * 30); 
+                        if (c >= 2 && c <= 6) mobility += 15;
+                        
+                    } else if (t === 'p') {
+                        if (c > 0 && map[r][c-1] === k) mobility += 15;
+                        if (c < 8 && map[r][c+1] === k) mobility += 15;
+                        const eKing = isRed ? bKing : rKing;
+                        if (eKing && ((isRed && r < 5) || (!isRed && r > 4))) { 
+                            let dist = Math.abs(c - eKing.c) + Math.abs(r - eKing.r);
+                            if (dist <= 3) threat += 40; if (dist <= 2) threat += 60;
+                        }
+                        const crossed = (isRed && r <= 4) || (!isRed && r >= 5);
+                        if(crossed) { mobility += 30; if(c >= 3 && c <= 5) mobility += 15; }
+                        const pDir = isRed ? -1 : 1; let isPassed = true;
+                        for(let nr = r + pDir; nr >= 0 && nr < 10; nr += pDir) {
+                            const p = map[nr] && map[nr][c];
+                            if(p) { if(p.toLowerCase() === 'p') isPassed = false; break; }
+                        }
+                        if(isPassed && crossed) mobility += 40; 
+                    }
+                    s += isRed ? (mobility + threat) : -(mobility + threat);
+                }
+            }
+            return s;
+        },
+
+        genMoves(map, isRed, onlyCaptures=false, ply=-1) {
+            const moves = [];
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                const k = map[r][c];
+                if(!k || (isRed && k>='a') || (!isRed && k<'a')) continue;
+                
+                const t = k.toLowerCase();
+                let av = 0;
+                if(t==='c') av = this.val_c; else if(t==='n') av = this.val_n; else av = C.vals[t]||0;
+
+                const addMove = (tc, tr) => {
+                    if(tc < 0 || tc > 8 || tr < 0 || tr > 9) return;
+                    const target = map[tr][tc];
+                    const isCapture = target !== 0 && ((isRed && target >='a') || (!isRed && target < 'a'));
+                    if (onlyCaptures && !isCapture) return;
+                    if (target && !isCapture) return; 
+
+                    let sortScore = 0;
+                    const moveBase = (r << 12) | (c << 8) | (tr << 4) | tc;
+
+                    if (isCapture) {
+                        let tv=0;
+                        const tt = target.toLowerCase();
+                        if(tt==='c') tv = this.val_c; else if(tt==='n') tv = this.val_n; else tv = C.vals[tt]||0;
+                        sortScore = 20000 + tv - av; 
+                        
+                        if (tv < av && this.sqAttacked(map, tc, tr, !isRed)) {
+                            sortScore = 1000; 
+                        }
+                    } else {
+                        if (ply >= 0 && this.killers && this.killers[ply]) {
+                            if (this.killers[ply][0] === moveBase) sortScore = 19000;
+                            else if (this.killers[ply][1] === moveBase) sortScore = 18000;
+                        }
+                        if (sortScore === 0) {
+                            let hist = this.historyTable ? this.historyTable[(r*9+c)*90 + (tr*9+tc)] : 0;
+                            if (hist > 7000) hist = 7000; 
+                            let pstVal = C.pst[t] ? (C.pst[t][isRed ? 9-tr : tr][tc] || 0) : 0;
+                            sortScore = Math.floor(hist/10) + pstVal + 1000; 
+                            
+                            if (av >= 400 && this.sqAttacked(map, tc, tr, !isRed)) {
+                                sortScore = 10; 
+                            }
+                        }
+                    }
+                    
+                    const encoded = (sortScore * 131072) + (isCapture ? 65536 : 0) + moveBase;
+                    moves.push(encoded);
+                };
+
+                if(t==='r' || t==='c') {
+                    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dc,dr])=>{
+                        let nc=c+dc, nr=r+dr, jump=false;
+                        while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                            const tg = map[nr][nc];
+                            if(t==='r') { if(!tg) addMove(nc,nr); else { addMove(nc,nr); break; } }
+                            else { if(!tg && !jump) addMove(nc,nr); else if(tg && !jump) jump=true; else if(tg && jump) { addMove(nc,nr); break; } }
+                            nc+=dc; nr+=dr;
+                        }
+                    });
+                } else if(t==='n') {
+                    [[-1,-2],[-1,2],[1,-2],[1,2],[-2,-1],[-2,1],[2,-1],[2,1]].forEach(([dc,dr])=>{
+                        const tc=c+dc, tr=r+dr;
+                        if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
+                            const legC = c + (Math.abs(dc)===2 ? dc/2 : 0);
+                            const legR = r + (Math.abs(dr)===2 ? dr/2 : 0);
+                            if(legR>=0 && legR<10 && legC>=0 && legC<9) { if(!map[legR][legC]) addMove(tc, tr); }
+                        }
+                    });
+                } else if(t==='p') {
+                    addMove(c, r + (isRed ? -1 : 1));
+                    if(isRed ? r<=4 : r>=5) { addMove(c-1,r); addMove(c+1,r); }
+                } else if(t==='k' || t==='j' || t==='a' || t==='s') {
+                     [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
+                        if((t==='k'||t==='j')&&dc*dr!==0) return; if((t==='a'||t==='s')&&dc*dr===0) return;
+                        const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) addMove(nc,nr);
+                     });
+                     if (t==='k' || t==='j') {
+                         let nr = r + (isRed ? -1 : 1);
+                         while(nr >= 0 && nr <= 9) {
+                             const tg = map[nr][c];
+                             if (tg) { if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); break; }
+                             nr += (isRed ? -1 : 1);
+                         }
+                     }
+                } else if(t==='b' || t==='x') {
+                    [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(([dc,dr])=>{
+                        const tc=c+dc, tr=r+dr;
+                        if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                            const br=r+dr/2, bc=c+dc/2;
+                            if(br>=0&&br<10&&bc>=0&&bc<9 && !map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc,tr); }
+                        }
+                    });
+                }
+            }
+            return moves.sort((a,b) => b - a); 
+        },
+
+        quiesce(map, alpha, beta, isMax, ply) {
+            this.checkTime();
+            if (this.abortSearch) return alpha;
+
+            if (ply >= 100) return this.eval(map);
+            
+            const inCheck = !Rules.isLegal(map, isMax);
+            let stand_pat = -Infinity;
+
+            if (!inCheck) {
+                stand_pat = this.eval(map);
+                if (isMax) {
+                    if (stand_pat >= beta) return stand_pat;
+                    alpha = Math.max(alpha, stand_pat);
+                } else {
+                    if (stand_pat <= alpha) return stand_pat;
+                    beta = Math.min(beta, stand_pat);
+                }
+            }
+
+            const moves = this.genMoves(map, isMax, !inCheck, -1); 
+
+            if (moves.length === 0) {
+                if (inCheck) return isMax ? -10000 + ply : 10000 - ply;
+                return stand_pat; 
+            }
+
+            let best = inCheck ? (isMax ? -Infinity : Infinity) : stand_pat;
+
+            for(let i=0; i<moves.length; i++) {
+                const m = moves[i];
+                const moveBase = m % 65536;
+                const tc = moveBase & 0xF, tr = (moveBase >> 4) & 0xF, fc = (moveBase >> 8) & 0xF, fr = (moveBase >> 12) & 0xF;
+                const t = map[tr][tc];
+                if(t && (t==='k'||t==='K')) return isMax ? 10000 : -10000;
+                
+                map[tr][tc] = map[fr][fc]; map[fr][fc] = 0;
+                const val = this.quiesce(map, alpha, beta, !isMax, ply + 1);
+                map[fr][fc] = map[tr][tc]; map[tr][tc] = t;
+
+                if(isMax) { 
+                    best = Math.max(best, val); 
+                    alpha = Math.max(alpha, best); 
+                } else { 
+                    best = Math.min(best, val); 
+                    beta = Math.min(beta, best); 
+                }
+                if(beta <= alpha) break; 
+            }
+            return best;
+        },
+
+        search(map, depth, alpha, beta, isMax, ply, rootPathLen, isNullMove = false) {
+            this.checkTime();
+            if (this.abortSearch) return alpha;
+
+            if (ply >= 100) return this.eval(map);
+
+            const currentPathIdx = rootPathLen + ply;
+            this.path[currentPathIdx] = isNullMove ? 0n : Zobrist.key;
+
+            const inCheck = !Rules.isLegal(map, isMax);
+
+            let extension = 0;
+            if (inCheck && !isNullMove && ply < 20) extension = 1;
+
+            const ttVal = TT.probe(Zobrist.key, depth, alpha, beta, isMax);
+            if(ttVal !== null) return ttVal;
+            
+            if(depth <= 0) return this.quiesce(map, alpha, beta, isMax, ply);
+
+            let stand_pat = this.eval(map);
+            
+            if (depth >= 3 && !isNullMove && ply > 0 && !inCheck && this.phaseMat >= 4) {
+                let R = depth > 6 ? 3 : 2; 
+                if (isMax && stand_pat >= beta) {
+                    let nullVal = this.search(map, depth - 1 - R, beta - 1, beta, !isMax, ply + 1, rootPathLen, true);
+                    if (nullVal >= beta) return beta; 
+                } else if (!isMax && stand_pat <= alpha) {
+                    let nullVal = this.search(map, depth - 1 - R, alpha, alpha + 1, !isMax, ply + 1, rootPathLen, true);
+                    if (nullVal <= alpha) return alpha; 
+                }
+            }
+
+            const moves = this.genMoves(map, isMax, false, ply);
+            
+            if (moves.length === 0) return isMax ? -10000 + ply : 10000 - ply;
+
+            let best = isMax ? -Infinity : Infinity;
+            const oldAlpha = alpha;
+            const oldBeta = beta;
+            let bSearchPv = true; 
+            
+            const nextDepth = depth - 1 + extension;
+
+            for(let i=0; i<moves.length; i++) {
+                const m = moves[i];
+                const sortScore = Math.floor(m / 131072);
+                const moveBase = m % 65536;
+                const tc = moveBase & 0xF, tr = (moveBase >> 4) & 0xF, fc = (moveBase >> 8) & 0xF, fr = (moveBase >> 12) & 0xF;
+                const isCap = Math.floor(m / 65536) % 2 === 1;
+                const t = map[tr][tc];
+
+                if(t && (t==='k'||t==='K')) return isMax ? 10000 + depth : -10000 - depth;
+                
+                let isKiller = false;
+                if (ply < 128 && this.killers[ply]) {
+                    isKiller = (this.killers[ply][0] === moveBase || this.killers[ply][1] === moveBase);
+                }
+                
+                Zobrist.toggle(map[fr][fc], fr, fc); 
+                if(t) Zobrist.toggle(t, tr, tc);         
+                Zobrist.toggle(map[fr][fc], tr, tc); 
+                map[tr][tc] = map[fr][fc]; map[fr][fc] = 0;
+                
+                let val;
+                let needsFullSearch = true;
+
+                if (!bSearchPv) {
+                    if (depth >= 3 && i > 4 && !isCap && !inCheck && !isKiller) {
+                        let reduction = (depth > 5 && i > 10) ? 2 : 1; 
+                        if (sortScore <= 10) reduction++; 
+                        
+                        if (isMax) {
+                            val = this.search(map, nextDepth - reduction, alpha, alpha + 1, !isMax, ply + 1, rootPathLen, false);
+                            needsFullSearch = val > alpha;
+                        } else {
+                            val = this.search(map, nextDepth - reduction, beta - 1, beta, !isMax, ply + 1, rootPathLen, false);
+                            needsFullSearch = val < beta;
+                        }
+                    } else {
+                        if (isMax) {
+                            val = this.search(map, nextDepth, alpha, alpha + 1, !isMax, ply + 1, rootPathLen, false);
+                            needsFullSearch = val > alpha;
+                        } else {
+                            val = this.search(map, nextDepth, beta - 1, beta, !isMax, ply + 1, rootPathLen, false);
+                            needsFullSearch = val < beta;
+                        }
+                    }
+                }
+
+                if (needsFullSearch) {
+                    val = this.search(map, nextDepth, alpha, beta, !isMax, ply + 1, rootPathLen, false);
+                }
+                
+                Zobrist.toggle(map[tr][tc], tr, tc); 
+                if(t) Zobrist.toggle(t, tr, tc);
+                Zobrist.toggle(map[tr][tc], fr, fc);
+                map[fr][fc] = map[tr][tc]; 
+                map[tr][tc] = t;
+
+                if (this.abortSearch) break;
+
+                if(isMax) {
+                    if (val > best) best = val;
+                    if (val > alpha) alpha = val;
+                } else {
+                    if (val < best) best = val;
+                    if (val < beta) beta = val;
+                }
+                
+                bSearchPv = false; 
+                
+                if(beta <= alpha) { 
+                    if (!isCap && ply < 128) { 
+                        if (this.killers[ply][0] !== moveBase) {
+                            this.killers[ply][1] = this.killers[ply][0];
+                            this.killers[ply][0] = moveBase;
+                        }
+                        this.historyTable[(fr*9+fc)*90 + (tr*9+tc)] += depth * depth;
+                    }
+                    break; 
+                }
+            }
+
+            let flag = 0; 
+            if (best <= oldAlpha) flag = 1; 
+            else if (best >= oldBeta) flag = 2; 
+            
+            TT.store(Zobrist.key, depth, best, flag, isMax);
+            return best;
+        },
+
+        think(map, timeLimit, historyMaps, turnColor, workerId = 0, totalWorkers = 1) {
+            this.startTime = Date.now();
+            this.timeLimit = timeLimit;
+            this.abortSearch = false;
+            this.nodes = 0;
+
+            const isRedTurn = (turnColor === 'r');
+            Zobrist.computeFull(map);
+            this.killers = Array.from({length: 128}, () => [null, null]);
+            this.historyTable = new Int32Array(8100);
+            
+            let pathLen = 0;
+            if (historyMaps) {
+                for (let hMap of historyMaps) { this.path[pathLen++] = Zobrist.computeFull(hMap); }
+            }
+            Zobrist.computeFull(map); 
+            this.path[pathLen] = Zobrist.key; 
+
+            this.phaseMat = 0;
+            for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+                const k = map[r][c];
+                if(k) { 
+                    const t=k.toLowerCase(); 
+                    if(t==='r') this.phaseMat += 2;
+                    else if(t==='c'||t==='n') this.phaseMat += 1; 
+                }
+            }
+            let phase = this.phaseMat / 16.0; if(phase>1) phase=1;
+            this.val_c = Math.floor(350 + 100 * phase);
+            this.val_n = Math.floor(450 - 50 * phase);
+
+            const moves = this.genMoves(map, isRedTurn, false, 0); 
+            if(moves.length === 0) return null; 
+
+            const validMoves = [];
+            for(let i=0; i<moves.length; i++) {
+                const m = moves[i];
+                const moveBase = m % 65536;
+                const tc = moveBase & 0xF, tr = (moveBase >> 4) & 0xF, fc = (moveBase >> 8) & 0xF, fr = (moveBase >> 12) & 0xF;
+                const saveT = map[tr][tc];
+                const saveF = map[fr][fc];
+                map[tr][tc] = saveF; map[fr][fc] = 0;
+                
+                const legal = Rules.isLegal(map, isRedTurn);
+                const kStr = map.flat().join(''); 
+                let count = 0;
+                for (let hm of historyMaps) { if (hm.flat().join('') === kStr) count++; }
+                
+                map[fr][fc] = saveF; map[tr][tc] = saveT;
+                
+                if(legal && count < 2) {
+                    validMoves.push({ raw: m, score: 0 });
+                }
+            }
+            if(validMoves.length === 0) return null;
+
+            let myMoves;
+            if (TT.isShared) {
+                myMoves = [...validMoves];
+                const shift = workerId % myMoves.length;
+                myMoves = myMoves.slice(shift).concat(myMoves.slice(0, shift));
+            } else {
+                myMoves = validMoves.filter((_, idx) => idx % totalWorkers === workerId);
+            }
+            if(myMoves.length === 0) return null;
+
+            let completedDepthBestMove = null;
+            let completedDepthBestVal = isRedTurn ? -Infinity : Infinity;
+            let prevScore = isRedTurn ? -Infinity : Infinity;
+            let finalDepth = 0;
+
+            for(let d=1; d<=32; d++) {
+                if (d > 1) {
+                    myMoves.sort((a, b) => isRedTurn ? b.score - a.score : a.score - b.score);
+                }
+
+                let currentDepthBestMove = null;
+                let currentDepthBestVal = isRedTurn ? -Infinity : Infinity; 
+                
+                let alpha = -Infinity, beta = Infinity;
+                if (d >= 3 && Math.abs(prevScore) < 9000) {
+                    alpha = prevScore - 50;
+                    beta = prevScore + 50;
+                }
+
+                for(let i=0; i<myMoves.length; i++) {
+                    const moveObj = myMoves[i];
+                    const m = moveObj.raw;
+                    const moveBase = m % 65536;
+                    const tc = moveBase & 0xF, tr = (moveBase >> 4) & 0xF, fc = (moveBase >> 8) & 0xF, fr = (moveBase >> 12) & 0xF;
+                    const t = map[tr][tc];
+                    
+                    Zobrist.toggle(map[fr][fc], fr, fc);
+                    if(t) Zobrist.toggle(t, tr, tc);
+                    Zobrist.toggle(map[fr][fc], tr, tc);
+                    map[tr][tc] = map[fr][fc]; map[fr][fc] = 0;
+                    
+                    let val = this.search(map, d-1, alpha, beta, !isRedTurn, 1, pathLen, false);
+                    
+                    if (d >= 3 && !this.abortSearch && (val <= alpha || val >= beta)) {
+                        alpha = -Infinity;
+                        beta = Infinity;
+                        val = this.search(map, d-1, alpha, beta, !isRedTurn, 1, pathLen, false);
+                    }
+                    
+                    Zobrist.toggle(map[tr][tc], tr, tc); 
+                    if(t) Zobrist.toggle(t, tr, tc);
+                    Zobrist.toggle(map[tr][tc], fr, fc);
+                    map[fr][fc] = map[tr][tc]; 
+                    map[tr][tc] = t;
+
+                    if (this.abortSearch) break;
+
+                    moveObj.score = val; 
+
+                    if (isRedTurn) {
+                        if (val > currentDepthBestVal || currentDepthBestMove === null) { currentDepthBestVal = val; currentDepthBestMove = m; }
+                        alpha = Math.max(alpha, currentDepthBestVal); 
+                    } else {
+                        if (val < currentDepthBestVal || currentDepthBestMove === null) { currentDepthBestVal = val; currentDepthBestMove = m; }
+                        beta = Math.min(beta, currentDepthBestVal); 
+                    }
+                }
+                
+                if (this.abortSearch) break; 
+
+                if (currentDepthBestMove !== null) {
+                    completedDepthBestMove = currentDepthBestMove;
+                    completedDepthBestVal = currentDepthBestVal;
+                    prevScore = currentDepthBestVal;
+                    finalDepth = d;
+                }
+                
+                if (Math.abs(completedDepthBestVal) > 9000) break;
+            }
+            
+            if (completedDepthBestMove === null) {
+                completedDepthBestMove = myMoves[0].raw;
+                finalDepth = 1;
+            }
+
+            const moveBase = completedDepthBestMove % 65536;
+            const tc = moveBase & 0xF, tr = (moveBase >> 4) & 0xF, fc = (moveBase >> 8) & 0xF, fr = (moveBase >> 12) & 0xF;
+            return { move: {fc, fr, tc, tr}, val: completedDepthBestVal, depth: finalDepth };
+        }
+    };
+    
+    onmessage = e => {
+        try {
+            if(e.data.type === 'go') {
+                if (!TT.isInitialized) TT.init(e.data.sharedTT);
+                if (!TT.isShared) TT.clear(); 
+
+                const ret = Engine.think(e.data.map, e.data.timeLimit, e.data.historyMaps, e.data.turn, e.data.workerId, e.data.totalWorkers);
+                postMessage(ret);
+            }
+        } catch(err) {
+            postMessage({ error: err.toString() });
+        }
+    }
+</script>
+
+<script>
+const THEMES = {
+    classic: { bg: '#e4d0a6', line: '#5d4037', p1: '#fff5f5', p2: '#f0fff4', p3: '#d0d0d0', rb: '#c0392b', bb: '#27ae60', rTxt: '#c00', bTxt: '#1e8449' },
+    wood: { bg: '#d1a870', line: '#4a2c11', p1: '#f2e2c4', p2: '#e3c79b', p3: '#c49a64', rb: '#8b0000', bb: '#1a1a1a', rTxt: '#8b0000', bTxt: '#1a1a1a' },
+    green: { bg: '#9bb89c', line: '#2e4c30', p1: '#ffffff', p2: '#ffffff', p3: '#cccccc', rb: '#c0392b', bb: '#2c3e50', rTxt: '#e74c3c', bTxt: '#2c3e50' }
+};
+
+const EvalC = {
+    vals: { 'k':10000, 'c':450, 'n':400, 'r':900, 'b':200, 'a':200, 'p':100, 'm':400, 'x':900, 's':200, 'j':200 },
+    pst: { 
+        p: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[10,0,20,0,20,0,20,0,10],[20,20,30,40,50,40,30,20,20],[30,30,40,50,60,50,40,30,30],[30,30,40,50,60,50,40,30,30],[0,0,0,0,0,0,0,0,0]],
+        r: [[0,0,0,0,0,0,0,0,0],[-2,10,5,10,10,10,5,10,-2],[0,0,5,0,0,0,5,0,0],[0,0,5,0,0,0,5,0,0],[0,4,8,12,15,12,8,4,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[0,5,8,12,15,12,8,5,0],[2,6,8,10,12,10,8,6,2],[2,6,8,10,12,10,8,6,2]],
+        n: [[-20,-20,-10,  0,  0,  0,-10,-20,-20],[ -2,  0,  2,  4,  4,  4,  2,  0, -2],[  0,  2,  4,  6,  8,  6,  4,  2,  0],[  0,  4,  6,  8,  8,  8,  6,  4,  0],[  0,  4,  6,  8,  8,  8,  6,  4,  0],[  0,  4,  6,  8, 10,  8,  6,  4,  0],[  0,  4,  6,  8, 10,  8,  6,  4,  0],[  0,  2,  4,  6,  8,  6,  4,  2,  0],[ -2,  0,  2,  4,  4,  4,  2,  0, -2],[-20,-20,-10,  0,  0,  0,-10,-20,-20]],
+        c: [[-20,-20,-20,-20,-20,-20,-20,-20,-20],[ -5, -5, -2, -2, -2, -2, -2, -5, -5],[  2,  2,  4,  6,  8,  6,  4,  2,  2],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  2,  4,  6,  4,  2,  0,  0],[  0,  0,  1,  2,  4,  2,  1,  0,  0],[  1,  1,  4,  5,  6,  5,  4,  1,  1],[  0,  1,  2,  3,  3,  3,  2,  1,  0],[  0,  0,  1,  2,  2,  2,  1,  0,  0]],
+        a: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,20,0,20,0,0,0],[0,0,0,0,30,0,0,0,0],[0,0,0,10,0,10,0,0,0]],
+        b: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,20,0,0,0,20,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,30,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,10,0,0,0,10,0,0]]
+    }
+};
+
+const RulesUI = {
+    isLegal(map, myColorIsRed) {
+        let rK = null, bK = null;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            if(map[r][c] === 'K') rK = {c, r};
+            if(map[r][c] === 'k') bK = {c, r};
+        }
+        if(!rK || !bK) return true; 
+        if(rK.c === bK.c) {
+            let count = 0;
+            const minR = Math.min(rK.r, bK.r);
+            const maxR = Math.max(rK.r, bK.r);
+            for(let r = minR + 1; r < maxR; r++) if(map[r][rK.c]) count++;
+            if(count === 0) return false;
+        }
+        const myKing = myColorIsRed ? rK : bK;
+        const enemyColorLower = myColorIsRed;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        for(let d of dirs) {
+            let jump = false, c = myKing.c + d[0], r = myKing.r + d[1];
+            while(c>=0 && c<9 && r>=0 && r<10) {
+                const p = map[r][c];
+                if(p) {
+                    const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                    if(isEnemy) {
+                        const type = p.toLowerCase();
+                        if(!jump) {
+                            if(type === 'r' || type === 'k') return false; 
+                            if(type === 'p' && (Math.abs(c - myKing.c) + Math.abs(r - myKing.r) === 1)) {
+                                if(enemyColorLower && r > myKing.r) {} else if(!enemyColorLower && r < myKing.r) {} else return false; 
+                            }
+                        } else if(type === 'c') return false;
+                    }
+                    if(p) { if(jump) break; jump = true; }
+                }
+                c += d[0]; r += d[1];
+            }
+        }
+        const knights = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+        for(let k of knights) {
+            const c = myKing.c + k[0], r = myKing.r + k[1];
+            if(c>=0 && c<9 && r>=0 && r<10) {
+                const p = map[r][c];
+                if(p) {
+                    const isEnemy = (enemyColorLower && p >='a') || (!enemyColorLower && p < 'a');
+                    if(isEnemy && p.toLowerCase() === 'n') {
+                        const legC = Math.abs(k[0]) === 2 ? myKing.c + k[0]/2 : c;
+                        const legR = Math.abs(k[1]) === 2 ? myKing.r + k[1]/2 : r;
+                        if(legR>=0 && legR<10 && legC>=0 && legC<9) {
+                            if(!map[legR][legC]) return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+};
+
+const Sound = {
+    ctx: null,
+    init() { try { const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC(); } catch(e) {} },
+    play(type) {
+        if(!Game.soundOn) return; 
+        if(!this.ctx) this.init();
+        if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        if(type === 'select') {
+            osc.frequency.setValueAtTime(600, t); osc.frequency.exponentialRampToValueAtTime(300, t+0.05);
+            gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.05);
+            osc.start(t); osc.stop(t+0.05);
+        } else if(type === 'move') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(50, t+0.1);
+            gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.1);
+            osc.start(t); osc.stop(t+0.1);
+        } else if(type === 'capture') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(100, t+0.15);
+            gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.15);
+            osc.start(t); osc.stop(t+0.15);
+        } else if(type === 'win') {
+            this.playTone(523, t, 0.2); this.playTone(659, t+0.1, 0.2); this.playTone(783, t+0.2, 0.4);
+        } else if(type === 'lose') {
+            this.playTone(300, t, 0.4); this.playTone(200, t+0.3, 0.6);
+        } else if(type === 'warn') {
+            this.playTone(150, t, 0.2);
+        } else if(type === 'check') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(800, t); osc.frequency.exponentialRampToValueAtTime(300, t+0.3);
+            gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.3);
+            osc.start(t); osc.stop(t+0.3);
+        }
+    },
+    playTone(freq, t, dur) {
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, t); gain.gain.linearRampToValueAtTime(0, t+dur);
+        osc.start(t); osc.stop(t+dur);
+    }
+};
+
+const View = {
+    cvs: document.getElementById('board'), ctx: null, grid: 0, margin: 0, theme: 'classic', flipped: false,
+    init() {
+        this.ctx = this.cvs.getContext('2d');
+        window.addEventListener('resize', () => { this.resize(); if(Game.map) Game.draw(); });
+        this.resize();
+    },
+    setTheme(t) {
+        this.theme = t;
+        if(Game.map) Game.draw(); 
+    },
+    resize() {
+        const box = document.getElementById('boardContainer');
+        const dpr = window.devicePixelRatio || 2;
+        let w = box.clientWidth, h = box.clientHeight;
+        
+        if (w === 0 || h === 0) {
+            const rect = box.getBoundingClientRect();
+            w = rect.width; h = rect.height;
+        }
+        if (w === 0) w = 350;
+        if (h === 0) h = w / (10.4 / 11.4);
+        
+        const targetRatio = 10.4 / 11.4;
+        if(w/h > targetRatio) w = h * targetRatio; else h = w / targetRatio;
+        
+        this.cvs.style.width = w+'px'; this.cvs.style.height = h+'px';
+        this.cvs.width = w*dpr; this.cvs.height = h*dpr;
+        this.grid = this.cvs.width / 10.4; 
+        this.margin = this.grid * 1.2; 
+    },
+    draw(map, sel, last, hints=[], anim=null) {
+        if(!this.ctx || !map) return;
+        const ctx = this.ctx, g = this.grid, m = this.margin, W = this.cvs.width, H = this.cvs.height;
+        const T = THEMES[this.theme];
+        const fx = c => this.flipped ? 8 - c : c;
+        const fy = r => this.flipped ? 9 - r : r;
+        
+        ctx.fillStyle = T.bg; ctx.fillRect(0,0,W,H);
+        document.getElementById('boardContainer').style.background = T.bg;
+        
+        const baseLineW = g * 0.035;
+        
+        ctx.strokeStyle = T.line; 
+        ctx.lineCap = 'square';
+        ctx.lineWidth = baseLineW * 2.2;
+        ctx.strokeRect(m - baseLineW/2, m - baseLineW/2, 8*g + baseLineW, 9*g + baseLineW);
+        
+        ctx.lineWidth = baseLineW * 0.8; 
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for(let i=1; i<9; i++) { ctx.moveTo(m, m+i*g); ctx.lineTo(W-m, m+i*g); }
+        for(let i=1; i<8; i++) {
+            ctx.moveTo(m+i*g, m); ctx.lineTo(m+i*g, m+4*g); 
+            ctx.moveTo(m+i*g, m+5*g); ctx.lineTo(m+i*g, H-m); 
+        }
+        [[3,0],[3,7]].forEach(([c,r])=>{
+            ctx.moveTo(m+c*g, m+r*g); ctx.lineTo(m+(c+2)*g, m+(r+2)*g);
+            ctx.moveTo(m+(c+2)*g, m+r*g); ctx.lineTo(m+c*g, m+(r+2)*g);
+        });
+        ctx.stroke();
+
+        const drawCross = (c, r) => {
+            const x = m + c*g, y = m + r*g, o = g*0.08, l = g*0.2;
+            ctx.beginPath(); ctx.lineWidth = baseLineW * 0.8;
+            if (c > 0) { ctx.moveTo(x-o-l, y-o); ctx.lineTo(x-o, y-o); ctx.lineTo(x-o, y-o-l); ctx.moveTo(x-o-l, y+o); ctx.lineTo(x-o, y+o); ctx.lineTo(x-o, y+o+l); }
+            if (c < 8) { ctx.moveTo(x+o+l, y-o); ctx.lineTo(x+o, y-o); ctx.lineTo(x+o, y-o-l); ctx.moveTo(x+o+l, y+o); ctx.lineTo(x+o, y+o); ctx.lineTo(x+o, y+o+l); }
+            ctx.stroke();
+        };
+        [1, 7].forEach(c => { drawCross(c, 2); drawCross(c, 7); });
+        [0, 2, 4, 6, 8].forEach(c => { drawCross(c, 3); drawCross(c, 6); });
+        
+        ctx.font = `bold ${g*0.55}px "STKaiti", "Kaiti SC", "Kaiti", serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillText(this.flipped?"界    汉":"楚    河", m + 2*g, m + 4.5*g + 2);
+        ctx.fillStyle = T.line;
+        ctx.fillText(this.flipped?"界    汉":"楚    河", m + 2*g, m + 4.5*g);
+        
+        ctx.save();
+        ctx.translate(m + 6*g, m + 4.5*g);
+        ctx.rotate(Math.PI);
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillText(this.flipped?"河    楚":"汉    界", 0, 2);
+        ctx.fillStyle = T.line;
+        ctx.fillText(this.flipped?"河    楚":"汉    界", 0, 0);
+        ctx.restore();
+
+        ctx.font = `bold ${g*0.3}px "Microsoft YaHei", sans-serif`;
+        const colsRed = ['九','八','七','六','五','四','三','二','一'];
+        const colsBlk = ['1','2','3','4','5','6','7','8','9'];
+        for(let c=0; c<9; c++) {
+            const drawC = this.flipped ? 8 - c : c;
+            ctx.fillText(colsBlk[c], m + drawC*g, m - g*0.8); 
+            ctx.fillText(colsRed[c], m + drawC*g, H - m + g*0.8); 
+        }
+        
+        const redCheck = !RulesUI.isLegal(map, true);
+        const blkCheck = !RulesUI.isLegal(map, false);
+
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = map[r][c];
+            if(k) {
+                if ((k === 'K' && redCheck) || (k === 'k' && blkCheck)) {
+                    ctx.beginPath(); ctx.arc(m+fx(c)*g, m+fy(r)*g, g*0.5, 0, 6.28);
+                    ctx.fillStyle = 'rgba(255, 69, 58, 0.4)'; ctx.fill();
+                }
+                this.drawPiece(ctx, k, m+fx(c)*g, m+fy(r)*g, g, T);
+            }
+        }
+        
+        if(sel) this.mark(fx(sel.c), fy(sel.r), '#30D158');
+        if(last) { this.mark(fx(last.fc), fy(last.fr), 'rgba(10,132,255,0.6)'); this.mark(fx(last.tc), fy(last.tr), 'rgba(10,132,255,0.8)'); }
+        hints.forEach(h => {
+            ctx.beginPath(); ctx.arc(m+fx(h.tc)*g, m+fy(h.tr)*g, g*0.12, 0, 6.28); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+        });
+
+        if(anim) {
+            const curX = m + (fx(anim.m.fc) + (fx(anim.m.tc) - fx(anim.m.fc)) * anim.p)*g;
+            const curY = m + (fy(anim.m.fr) + (fy(anim.m.tr) - fy(anim.m.fr)) * anim.p)*g;
+            this.drawPiece(ctx, anim.piece, curX, curY, g, T);
+        }
+    },
+    
+    drawPiece(ctx, k, x, y, g, T) {
+        const isRed = k<'a';
+        const pSize = g * 0.46; 
+        
+        ctx.save();
+        ctx.beginPath(); ctx.arc(x, y, pSize, 0, 6.28);
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = g * 0.1;
+        ctx.shadowOffsetX = g * 0.04;
+        ctx.shadowOffsetY = g * 0.06;
+        
+        const grad = ctx.createRadialGradient(x-g*0.15, y-g*0.15, g*0.05, x, y, pSize);
+        grad.addColorStop(0, isRed ? T.p1 : T.p2); grad.addColorStop(1, T.p3);
+        ctx.fillStyle = grad; ctx.fill();
+        ctx.restore(); 
+        
+        ctx.beginPath(); ctx.arc(x, y, pSize, 0, 6.28);
+        ctx.lineWidth = g*0.025; ctx.strokeStyle = isRed ? T.rb : T.bb; ctx.stroke();
+        
+        ctx.beginPath(); ctx.arc(x, y, pSize * 0.82, 0, 6.28);
+        ctx.lineWidth = g*0.015; ctx.globalAlpha = 0.2; ctx.stroke(); ctx.globalAlpha = 1.0;
+        
+        ctx.fillStyle = isRed ? T.rTxt : T.bTxt; 
+        const txt = {'k':'將','a':'士','b':'象','n':'馬','r':'車','c':'砲','p':'卒', 'K':'帅','A':'仕','B':'相','N':'马','R':'车','C':'炮','P':'兵'};
+        
+        ctx.font = `bold ${g*0.52}px "STKaiti", "Kaiti SC", "Kaiti", serif`; 
+        ctx.textBaseline = 'middle'; 
+        ctx.textAlign = 'center';    
+        ctx.fillText(txt[k]||k, x, y - g*0.03); 
+    },
+    mark(c, r, color) {
+        const x = this.margin + c*this.grid, y = this.margin + r*this.grid, s = this.grid*0.48, l = this.grid*0.15;
+        this.ctx.strokeStyle = color; this.ctx.lineWidth = 3; this.ctx.lineCap = "round";
+        this.ctx.beginPath();
+        [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dx,dy])=>{
+            this.ctx.moveTo(x+dx*s, y+dy*(s-l)); this.ctx.lineTo(x+dx*s, y+dy*s); this.ctx.lineTo(x+dx*(s-l), y+dy*s);
+        });
+        this.ctx.stroke();
+    }
+};
+
+const Particles = {
+    list: [], animating: false,
+    add(x, y, isRed) {
+        const color = isRed ? '#ff453a' : '#30d158'; 
+        for(let i=0; i<25; i++) {
+            this.list.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
+                life: 1.0, color: color, size: Math.random() * 3 + 2
+            });
+        }
+        if(!this.animating) this.animate();
+    },
+    animate() {
+        if(this.list.length === 0) { 
+            this.animating = false; Game.draw(); return; 
+        }
+        this.animating = true;
+        Game.draw();
+        
+        const ctx = View.ctx;
+        for(let i = this.list.length - 1; i >= 0; i--) {
+            let p = this.list[i];
+            p.x += p.vx; p.y += p.vy; 
+            p.vx *= 0.85; p.vy *= 0.85; 
+            p.life -= 0.04; 
+            if(p.life <= 0) { this.list.splice(i, 1); continue; }
+            
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1.0; 
+        requestAnimationFrame(() => this.animate());
+    }
+};
+
+let globalWorkerUrl = null;
+
+const Game = {
+    map: [], turn: 'r', sel: null, last: null, history: [], historyKeys: [], workers: [], 
+    gameStarted: false, gameOver: false, isAnimating: false, hintMove: null, movesCount: 0,
+    editMode: false, editPiece: 'K', mode: 'h-ai',
+    workerEpoch: 0, numWorkers: 6, soundOn: true, autoPlay: false,
+    isThinking: false, isInterrupted: false, pendingResolves: [], sharedTTBuffer: null,
+    
+    animFrameId: null, 
+    LIMIT_STEP: 60, LIMIT_GAME: 900, timers: { r: 900, b: 900, step: 60, t: null },
+
+    resetWorkers() {
+        this.isInterrupted = true; 
+        if(this.workers) this.workers.forEach(w => w.terminate());
+        this.workers = [];
+        
+        if (this.pendingResolves) {
+            this.pendingResolves.forEach(res => res(null)); 
+        }
+        this.pendingResolves = [];
+
+        try {
+            if(typeof SharedArrayBuffer !== 'undefined') {
+                this.sharedTTBuffer = new SharedArrayBuffer(100663296); 
+                if (this.workerEpoch === 0) UI.log("🔥 跨域隔离检测通过：已激活 100MB 安全共享内存！", "sys");
+            } else {
+                this.sharedTTBuffer = null;
+            }
+        } catch(e) {
+            this.sharedTTBuffer = null;
+            if (this.workerEpoch === 0) UI.log("⚠️ 未检测到跨域隔离头，降级为本地独立内存。请修改 Nginx 配置以解锁极限性能。", "warn");
+        }
+
+        if (!globalWorkerUrl) {
+            const blob = new Blob([document.getElementById('worker-code').textContent], {type:"text/javascript"});
+            globalWorkerUrl = window.URL.createObjectURL(blob);
+        }
+        for(let i=0; i<this.numWorkers; i++) {
+            this.workers.push(new Worker(globalWorkerUrl));
+        }
+        this.workerEpoch++;
+    },
+
+    toggleMenu() {
+        const sb = document.getElementById('appSidebar');
+        const ov = document.getElementById('sidebarOverlay');
+        if(sb.classList.contains('active')) {
+            sb.classList.remove('active');
+            ov.classList.remove('active');
+        } else {
+            sb.classList.add('active');
+            ov.classList.add('active');
+        }
+    },
+
+    closeMenuIfMobile() {
+        const sb = document.getElementById('appSidebar');
+        const ov = document.getElementById('sidebarOverlay');
+        if (window.innerWidth <= 900 && sb.classList.contains('active')) {
+            sb.classList.remove('active');
+            ov.classList.remove('active');
+        }
+    },
+
+    init() {
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
+        this.isAnimating = false;
+        this.isThinking = false;
+
+        const fen = [['r','n','b','a','k','a','b','n','r'],[0,0,0,0,0,0,0,0,0],[0,'c',0,0,0,0,0,'c',0],['p',0,'p',0,'p',0,'p',0,'p'],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],['P',0,'P',0,'P',0,'P',0,'P'],[0,'C',0,0,0,0,0,'C',0],[0,0,0,0,0,0,0,0,0],['R','N','B','A','K','A','B','N','R']];
+        const hc = parseInt(document.getElementById('handicap')?.value || '0');
+        if (hc === 1) fen[0][1] = 0; 
+        if (hc === 2) { fen[0][1] = 0; fen[0][7] = 0; } 
+        if (hc === 3) { fen[0][0] = 0; fen[0][8] = 0; } 
+        
+        this.map = JSON.parse(JSON.stringify(fen));
+        this.turn = 'r'; this.sel = null; this.last = null; this.hintMove = null; this.movesCount = 0;
+        this.history = []; this.historyKeys = [this.toKey(this.map)]; 
+        this.gameStarted = false; this.gameOver = false; this.autoPlay = false; 
+        
+        this.mode = document.getElementById('gameMode').value;
+        const btn = document.getElementById("autoBtn");
+        if(btn) { btn.innerHTML = "▶️ 托管"; btn.classList.remove("active-toggle"); }
+        
+        this.timers = { r: this.LIMIT_GAME, b: this.LIMIT_GAME, step: this.LIMIT_STEP, t: null };
+
+        document.getElementById('log').innerHTML = ''; 
+        
+        this.resetWorkers();
+        View.init(); 
+        
+        UI.status("等待开局", false);
+        setTimeout(() => Game.draw(), 50); 
+        
+        UI.log(`系统初始化完成：V41 极简降噪修罗版已上线！`, 'sys');
+        this.uiUpdate();
+        
+        const h = e => {
+            if(this.gameOver || (this.gameStarted && !this.timers.t) || this.isThinking || this.isAnimating) return; 
+            if(this.mode === 'h-ai' && this.turn === 'b' && !this.editMode) return; 
+            if(this.autoPlay) this.toggleAuto(); 
+            e.preventDefault();
+            const rect = View.cvs.getBoundingClientRect();
+            const x = (e.clientX||e.touches[0].clientX) - rect.left, y = (e.clientY||e.touches[0].clientY) - rect.top;
+            
+            const cRaw = Math.round((x * (View.cvs.width/rect.width) - View.margin)/View.grid);
+            const rRaw = Math.round((y * (View.cvs.height/rect.height) - View.margin)/View.grid);
+            
+            const c = View.flipped ? 8 - cRaw : cRaw;
+            const r = View.flipped ? 9 - rRaw : rRaw;
+            
+            if(c>=0 && c<9 && r>=0 && r<10) this.click(c, r);
+        };
+        View.cvs.onmousedown = h; View.cvs.ontouchstart = h;
+    },
+
+    draw() { 
+        View.draw(this.map, this.sel, this.last); 
+        if (this.hintMove && !Particles.animating) {
+            const m = View.margin, g = View.grid, hm = this.hintMove;
+            const fx = c => View.flipped ? 8 - c : c;
+            const fy = r => View.flipped ? 9 - r : r;
+            View.ctx.beginPath();
+            View.ctx.moveTo(m + fx(hm.fc) * g, m + fy(hm.fr) * g); 
+            View.ctx.lineTo(m + fx(hm.tc) * g, m + fy(hm.tr) * g);
+            View.ctx.strokeStyle = '#ff9f0a'; 
+            View.ctx.lineWidth = 4; 
+            View.ctx.setLineDash([8, 8]); 
+            View.ctx.stroke();
+            View.ctx.setLineDash([]); 
+            View.mark(fx(hm.fc), fy(hm.fr), '#ff9f0a'); 
+            View.mark(fx(hm.tc), fy(hm.tr), '#ff9f0a');
+        }
+    },
+
+    toKey(map) { return map.flat().join(''); },
+
+    changeMode() {
+        this.mode = document.getElementById('gameMode').value;
+        UI.log(this.mode === 'h-h' ? "已切换至双人推演模式" : "已切换至人机模式", 'sys');
+    },
+
+    toggleEdit() {
+        if(this.isThinking || this.isAnimating) return;
+        this.editMode = true;
+        document.getElementById('editOverlay').style.display = 'flex';
+        UI.log("进入创意摆局模式...", 'warn');
+        clearInterval(this.timers.t);
+        this.sel = null; this.last = null; this.hintMove = null;
+        if(this.autoPlay) this.toggleAuto();
+        this.draw(); 
+        this.closeMenuIfMobile(); 
+    },
+
+    selEdit(p, el) {
+        this.editPiece = p;
+        document.querySelectorAll('.p-piece, .p-clear').forEach(e => e.classList.remove('sel'));
+        el.classList.add('sel');
+    },
+
+    clearBoard() {
+        this.resetWorkers();
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) this.map[r][c] = 0;
+        Sound.play('move'); this.draw();
+    },
+
+    finishEdit() {
+        this.resetWorkers();
+        let rk=0, bk=0;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            if(this.map[r][c]==='K') rk++;
+            if(this.map[r][c]==='k') bk++;
+        }
+        if(rk!==1 || bk!==1) { alert("配置无效：红黑双方必须各有一个将/帅！"); return; }
+        
+        this.editMode = false;
+        document.getElementById('editOverlay').style.display = 'none';
+        this.history = []; this.historyKeys = [this.toKey(this.map)]; 
+        this.movesCount = 0; this.turn = 'r'; this.gameStarted = false; this.gameOver = false;
+        this.timers = { r: this.LIMIT_GAME, b: this.LIMIT_GAME, step: this.LIMIT_STEP, t: null };
+        UI.log("配置写入完成，重新开局！", 'sys');
+        this.uiUpdate(); this.draw(); 
+    },
+
+    evaluate() {
+        let phaseMat = 0;
+        let rKing = null, bKing = null;
+        let rA = 0, rE = 0, bA = 0, bE = 0;
+        
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = this.map[r][c];
+            if(k) { 
+                const t=k.toLowerCase(); 
+                if(t==='r'||t==='c'||t==='n') phaseMat++; 
+                if (k === 'K') rKing = {r, c}; else if (k === 'k') bKing = {r, c};
+                else if (k === 'A' || k === 'S') rA++; else if (k === 'B' || k === 'X') rE++;
+                else if (k === 'a' || k === 's') bA++; else if (k === 'b' || k === 'x') bE++;
+            }
+        }
+        let phase = phaseMat / 12.0; if(phase>1) phase=1;
+        const val_c = Math.floor(350 + 100 * phase);
+        const val_n = Math.floor(450 - 50 * phase);
+
+        let s = 0;
+        for(let r=0; r<10; r++) for(let c=0; c<9; c++) {
+            const k = this.map[r][c];
+            if(!k) continue;
+            const t = k.toLowerCase(), isRed = k<'a';
+            let v = 0;
+            if(t==='c') v = val_c; else if(t==='n') v = val_n; else v = EvalC.vals[t] || 0;
+            if(EvalC.pst[t] && EvalC.pst[t][isRed ? 9-r : r]) {
+                v += EvalC.pst[t][isRed ? 9-r : r][c] || 0;
+            }
+            
+            let mobility = 0, threat = 0;
+            if (t === 'r') {
+                const rDir = isRed ? 1 : -1; let isOpen = true;
+                for(let nr = r + rDir; nr >= 0 && nr < 10; nr += rDir) {
+                    const p = this.map[nr] && this.map[nr][c];
+                    if(p) { if(p.toLowerCase() === 'p' && (p < 'a') === isRed) isOpen = false; break; }
+                }
+                if(isOpen) mobility += 25;
+                
+                const eKing = isRed ? bKing : rKing;
+                if (eKing) {
+                    if (c === eKing.c) { 
+                        let pb = 0;
+                        for(let i=Math.min(r, eKing.r)+1; i<Math.max(r, eKing.r); i++) if(this.map[i] && this.map[i][c]) pb++;
+                        if (pb === 0) threat += (isOpen ? 80 : 50); else if (pb === 1) threat += 20;
+                    }
+                    if (r === eKing.r) { 
+                        let pb = 0;
+                        for(let i=Math.min(c, eKing.c)+1; i<Math.max(c, eKing.c); i++) if(this.map[r] && this.map[r][i]) pb++;
+                        if (pb === 0) threat += (isOpen ? 80 : 50); else if (pb === 1) threat += 20;
+                    }
+                }
+
+            } else if (t === 'c') {
+                let count = 0;
+                const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                for(let i=0; i<4; i++) {
+                    let nc = c + dirs[i][0], nr = r + dirs[i][1];
+                    while(nc>=0 && nc<9 && nr>=0 && nr<10) {
+                        if(!this.map[nr] || !this.map[nr][nc]) count++; else break;
+                        nc += dirs[i][0]; nr += dirs[i][1];
+                    }
+                }
+                mobility = count * 5; 
+
+                const eKing = isRed ? bKing : rKing;
+                if (eKing) {
+                    if (c === eKing.c) { 
+                        let pb = 0;
+                        for(let i=Math.min(r, eKing.r)+1; i<Math.max(r, eKing.r); i++) if(this.map[i] && this.map[i][c]) pb++;
+                        if (pb === 1) threat += 100; else if (pb === 2) threat += 50; 
+                    }
+                    if (r === eKing.r) { 
+                        let pb = 0;
+                        for(let i=Math.min(c, eKing.c)+1; i<Math.max(c, eKing.c); i++) if(this.map[r] && this.map[r][i]) pb++;
+                        if (pb === 1) threat += 100; else if (pb === 2) threat += 50; 
+                    }
+                }
+
+            } else if (t === 'n') {
+                let count = 0, blocked = 0;
+                const moves = [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]];
+                for(let i=0; i<8; i++) {
+                    const d = moves[i];
+                    const tc = c + d[0], tr = r + d[1];
+                    if(tc>=0 && tc<=8 && tr>=0 && tr<=9) {
+                        const legC = c + (Math.abs(d[0])===2 ? d[0]/2 : 0);
+                        const legR = r + (Math.abs(d[1])===2 ? d[1]/2 : 0);
+                        if(this.map[legR]) { if(!this.map[legR][legC]) count++; else blocked++; }
+                    }
+                }
+                mobility = (count * 4) - (blocked * 30); 
+                if (c >= 2 && c <= 6) mobility += 15;
+                
+            } else if (t === 'p') {
+                if (c > 0 && this.map[r][c-1] === k) mobility += 15;
+                if (c < 8 && this.map[r][c+1] === k) mobility += 15;
+                const eKing = isRed ? bKing : rKing;
+                if (eKing && ((isRed && r < 5) || (!isRed && r > 4))) { 
+                    let dist = Math.abs(c - eKing.c) + Math.abs(r - eKing.r);
+                    if (dist <= 3) threat += 40; if (dist <= 2) threat += 60;
+                }
+                const crossed = (isRed && r <= 4) || (!isRed && r >= 5);
+                if(crossed) { mobility += 30; if(c >= 3 && c <= 5) mobility += 15; }
+                const pDir = isRed ? -1 : 1; let isPassed = true;
+                for(let nr = r + pDir; nr >= 0 && nr < 10; nr += pDir) {
+                    const p = this.map[nr] && this.map[nr][c];
+                    if(p) { if(p.toLowerCase() === 'p') isPassed = false; break; }
+                }
+                if(isPassed && crossed) mobility += 40; 
+            }
+            s += isRed ? (mobility + threat) : -(mobility + threat);
+        }
+        return s;
+    },
+
+    getNotation(map, m) {
+        const p = map[m.fr][m.fc];
+        if (!p) return "";
+        const isRed = p < 'a', t = p.toLowerCase();
+        const nRed = {'p':'兵','c':'炮','r':'车','n':'马','b':'相','a':'仕','k':'帅'};
+        const nBlk = {'p':'卒','c':'砲','r':'車','n':'馬','b':'象','a':'士','k':'將'};
+        const cRed = ['九','八','七','六','五','四','三','二','一'];
+        const cBlk = ['1','2','3','4','5','6','7','8','9'];
+        const numR = ['一','二','三','四','五','六','七','八','九'];
+        const numB = ['1','2','3','4','5','6','7','8','9'];
+
+        const name = isRed ? nRed[t] : nBlk[t];
+        let startCol = isRed ? cRed[m.fc] : cBlk[m.fc];
+
+        let sameCount = 0, p1R = -1, p2R = -1;
+        for(let r=0; r<10; r++) {
+            if(map[r][m.fc] === p) {
+                sameCount++;
+                if(p1R === -1) p1R = r; else p2R = r;
+            }
+        }
+
+        let prefix = name + startCol;
+        if (sameCount === 2 && (t==='c'||t==='r'||t==='n'||t==='p')) {
+            if(isRed) prefix = (m.fr === p1R ? "前" : "后") + name; 
+            else prefix = (m.fr === p2R ? "前" : "后") + name; 
+        }
+
+        let dir = "";
+        if(m.tr === m.fr) dir = "平";
+        else if(isRed) dir = m.tr < m.fr ? "进" : "退";
+        else dir = m.tr > m.fr ? "进" : "退";
+
+        let end = "";
+        if (dir === "平" || t === 'n' || t === 'b' || t === 'a' || t === 'x' || t === 's' || t === 'm') {
+            end = isRed ? cRed[m.tc] : cBlk[m.tc];
+        } else {
+            const steps = Math.abs(m.tr - m.fr);
+            end = isRed ? numR[steps-1] : numB[steps-1];
+        }
+
+        return prefix + dir + end;
+    },
+
+    checkOpeningBook(map, historyMaps, turnColor) {
+        const isRedTurn = (turnColor === 'r');
+        const strKey = map.flat().join('');
+        const initialKey = "rnbakabnr0000000000c00000c0p0p0p0p0p000000000000000000P0P0P0P0P0C00000C0000000000RNBAKABNR";
+        
+        if (strKey === initialKey && historyMaps.length === 0 && isRedTurn) {
+            const book = [
+                {fc:7, fr:7, tc:4, tr:7}, {fc:1, fr:7, tc:4, tr:7}, 
+                {fc:6, fr:6, tc:6, tr:5}, {fc:2, fr:6, tc:2, tr:5}, 
+                {fc:6, fr:9, tc:4, tr:7}, {fc:2, fr:9, tc:4, tr:7}, 
+                {fc:7, fr:9, tc:6, tr:7}, {fc:1, fr:9, tc:2, tr:7}
+            ];
+            return book[Math.floor(Math.random() * book.length)];
+        }
+        if (historyMaps.length === 1 && !isRedTurn) {
+            let move = null;
+            if (map[7][4] === 'C') { 
+                const res = [{fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:0, tc:2, tr:2}, {fc:7, fr:2, tc:4, tr:2}, {fc:1, fr:2, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[5][6] === 'P') { 
+                const res = [{fc:7, fr:2, tc:6, tr:2}, {fc:2, fr:3, tc:2, tr:4}, {fc:2, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[5][2] === 'P') { 
+                const res = [{fc:1, fr:2, tc:2, tr:2}, {fc:6, fr:3, tc:6, tr:4}, {fc:6, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[7][4] === 'B') { 
+                const res = [{fc:7, fr:2, tc:4, tr:2}, {fc:1, fr:2, tc:4, tr:2}, {fc:7, fr:0, tc:6, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else if (map[7][6] === 'N' || map[7][2] === 'N') { 
+                const res = [{fc:6, fr:3, tc:6, tr:4}, {fc:2, fr:3, tc:2, tr:4}, {fc:7, fr:2, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            } else {
+                const res = [{fc:7, fr:0, tc:6, tr:2}, {fc:1, fr:0, tc:2, tr:2}, {fc:2, fr:0, tc:4, tr:2}];
+                move = res[Math.floor(Math.random() * res.length)];
+            }
+            return move;
+        }
+        return null;
+    },
+
+    async queryCloudBook(map, turnColor) {
+        let fen = "";
+        for (let r = 0; r < 10; r++) {
+            let empty = 0;
+            let rowFen = "";
+            for (let c = 0; c < 9; c++) {
+                const p = map[r][c];
+                if (p) {
+                    if (empty > 0) { rowFen += empty; empty = 0; }
+                    rowFen += p;
+                } else {
+                    empty++;
+                }
+            }
+            if (empty > 0) rowFen += empty;
+            fen += rowFen;
+            if (r < 9) fen += "/";
+        }
+        fen += (turnColor === 'r' ? " w " : " b ") + "- - 0 1";
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1000); 
+        
+        try {
+            const response = await fetch(`https://www.chessdb.cn/chessdb.php?action=queryall&board=${encodeURIComponent(fen)}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const text = await response.text();
+            
+            if (text && text.includes("move:")) {
+                const moves = text.split('|');
+                const firstMoveStr = moves[0];
+                const firstMoveMatch = firstMoveStr.match(/move:([a-i][0-9][a-i][0-9])/);
+                
+                if (firstMoveMatch && firstMoveMatch[1]) {
+                    const ucci = firstMoveMatch[1];
+                    const fc = ucci.charCodeAt(0) - 97; 
+                    const fr = 9 - parseInt(ucci[1]);
+                    const tc = ucci.charCodeAt(2) - 97;
+                    const tr = 9 - parseInt(ucci[3]);
+                    
+                    const scoreMatch = firstMoveStr.match(/score:(-?\d+)/);
+                    const depthMatch = firstMoveStr.match(/depth:(\d+)/);
+                    let score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+                    let depth = depthMatch ? parseInt(depthMatch[1]) : 0;
+                    
+                    const p = map[fr][fc];
+                    if (p && ((turnColor === 'r' && p < 'a') || (turnColor === 'b' && p > 'Z'))) {
+                        return { move: {fc, fr, tc, tr}, val: score, depth: depth, isCloud: true };
+                    }
+                }
+            }
+            return null;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            return null;
+        }
+    },
+
+    async runWorkers(map, timeLimit, historyMaps, turnColor) {
+        this.isInterrupted = false; 
+        
+        let pieceCount = 0;
+        for (let r = 0; r < 10; r++) {
+            for (let c = 0; c < 9; c++) {
+                if (map[r][c]) pieceCount++;
+            }
+        }
+
+        if (this.movesCount <= 15 || pieceCount <= 7) {
+            const cloudInfo = await this.queryCloudBook(map, turnColor);
+            if (cloudInfo) return cloudInfo;
+        }
+
+        const bookMove = this.checkOpeningBook(map, historyMaps, turnColor);
+        if (bookMove) {
+            return { move: bookMove, val: 0, depth: "名谱", isCloud: false };
+        }
+
+        const currentEpoch = this.workerEpoch;
+        this.pendingResolves = []; 
+        
+        if (this.sharedTTBuffer) {
+            new Int8Array(this.sharedTTBuffer, 10 * 8388608, 8388608).fill(-1);
+        }
+        
+        const promises = this.workers.map((worker, i) => {
+            return new Promise(resolve => {
+                this.pendingResolves.push(resolve);
+                worker.onmessage = e => {
+                    if (e.data && e.data.error) {
+                        resolve(null);
+                    } else {
+                        resolve(e.data);
+                    }
+                };
+                worker.postMessage({ type: 'go', map, timeLimit, historyMaps, turn: turnColor, workerId: i, totalWorkers: this.numWorkers, sharedTT: this.sharedTTBuffer });
+            });
+        });
+
+        const results = await Promise.all(promises);
+        this.pendingResolves = []; 
+        
+        if (this.isInterrupted || currentEpoch !== this.workerEpoch) return null;
+
+        let bestVal = (turnColor === 'r') ? -Infinity : Infinity;
+        let maxDepth = 0;
+
+        for (let res of results) {
+            if (res && res.move) {
+                if (res.depth > maxDepth) maxDepth = res.depth;
+                if (turnColor === 'r') { if (res.val > bestVal) bestVal = res.val; } 
+                else { if (res.val < bestVal) bestVal = res.val; }
+            }
+        }
+
+        let candidateMoves = [];
+        let isForcedMate = Math.abs(bestVal) > 9000;
+        
+        for (let res of results) {
+            if (res && res.move) {
+                if (isForcedMate) {
+                    if (res.val === bestVal) candidateMoves.push(res);
+                } else {
+                    if (turnColor === 'r' && res.val >= bestVal - 10) candidateMoves.push(res);
+                    if (turnColor === 'b' && res.val <= bestVal + 10) candidateMoves.push(res);
+                }
+            }
+        }
+
+        if (candidateMoves.length === 0) return null;
+        let chosen = candidateMoves[Math.floor(Math.random() * candidateMoves.length)];
+        return { move: chosen.move, val: chosen.val, depth: chosen.depth, isCloud: false };
+    },
+
+    async hint() {
+        if(this.gameOver || this.editMode || this.isThinking || this.isAnimating) return; 
+        this.isThinking = true;
+        
+        UI.status("混动引擎神机妙算中...", true);
+        this.hintMove = null;
+        const timeLimit = parseInt(document.getElementById('depth').value);
+        
+        await new Promise(r => setTimeout(r, 50));
+        const bestInfo = await this.runWorkers(this.map, timeLimit, this.history, this.turn);
+        
+        this.isThinking = false;
+        if(this.isInterrupted || this.gameOver || this.editMode) return; 
+        
+        if (!bestInfo) {
+            this.end(this.turn === 'r' ? "预测结果：红方已被绝杀无解！" : "预测结果：黑方已被绝杀无解！");
+            this.closeMenuIfMobile();
+            return;
+        }
+        
+        UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
+        if(bestInfo.move) {
+            this.hintMove = bestInfo.move;
+            this.draw();
+            this.closeMenuIfMobile(); 
+        }
+    },
+
+    toggleSound() {
+        this.soundOn = !this.soundOn;
+        const btn = document.getElementById("soundBtn");
+        if(btn) {
+            btn.classList.toggle("active-toggle", !this.soundOn);
+        }
+    },
+
+    flipBoard() {
+        View.flipped = !View.flipped;
+        this.draw();
+        this.closeMenuIfMobile();
+    },
+
+    toggleAuto() {
+        this.autoPlay = !this.autoPlay;
+        const btn = document.getElementById("autoBtn");
+        if(btn) {
+            btn.classList.toggle("active-toggle", this.autoPlay);
+        }
+        this.closeMenuIfMobile();
+        if(this.autoPlay && !this.gameOver && !this.isThinking) this.autoNext();
+    },
+
+    async autoNext() {
+        if(!this.autoPlay || this.gameOver || this.isThinking || this.isAnimating) return;
+        this.isThinking = true;
+        this.hintMove = null;
+        UI.status("混动引擎时空演算中...", true);
+        const timeLimit = parseInt(document.getElementById("depth").value);
+        
+        const bestInfo = await this.runWorkers(this.map, timeLimit, this.history, this.turn);
+        this.isThinking = false;
+        
+        if(!this.autoPlay || this.gameOver || this.isInterrupted) return; 
+        
+        if (!bestInfo) {
+            this.end(this.turn === 'r' ? "AI 系统判定：红方被困毙/绝杀，黑方获胜！" : "AI 系统判定：黑方被困毙/绝杀，红方获胜！");
+            if(this.autoPlay) this.toggleAuto(); 
+            return;
+        }
+        
+        this.animateMove(bestInfo.move, () => {
+            setTimeout(() => this.autoNext(), 400); 
+        }, bestInfo);
+    },
+
+    getMoves(c, r) {
+        const k = this.map[r][c]; if(!k) return [];
+        const type = k.toLowerCase(), isRed = k<'a'; const moves = [];
+        
+        const addMove = (tc, tr) => {
+            if(tc < 0 || tc > 8 || tr < 0 || tr > 9) return;
+            const target = this.map[tr][tc];
+            if(!target || (isRed ? target>'Z' : target<'a')) {
+                const saveT = this.map[tr][tc], saveF = this.map[r][c];
+                this.map[tr][tc] = saveF; this.map[r][c] = 0;
+                if(RulesUI.isLegal(this.map, isRed)) moves.push({tc,tr});
+                this.map[r][c] = saveF; this.map[tr][tc] = saveT;
+            }
+        };
+        
+        if(type==='p') {
+            const dir=isRed?-1:1; addMove(c,r+dir);
+            if(isRed?r<=4:r>=5) { addMove(c-1,r); addMove(c+1,r); }
+        } else if(type==='n') {
+            [[1,2],[1,-2],[-1,2],[-1,-2],[2,1],[2,-1],[-2,1],[-2,-1]].forEach(([dc,dr])=>{
+                const tc=c+dc, tr=r+dr;
+                if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                     const br = r+(Math.abs(dr)===2?dr/2:0), bc = c+(Math.abs(dc)===2?dc/2:0);
+                     if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) addMove(tc, tr);
+                }
+            });
+        } else if(type==='r'||type==='c') {
+            [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dc,dr])=>{
+                let nc=c+dc, nr=r+dr, jump=false;
+                while(nc>=0&&nc<9&&nr>=0&&nr<10) {
+                    const tg = this.map[nr][nc];
+                    if(type==='r') { if(!tg) addMove(nc,nr); else { addMove(nc,nr); break; } }
+                    else { if(!tg && !jump) addMove(nc,nr); else if(tg && !jump) jump=true; else if(tg && jump) { addMove(nc,nr); break; } }
+                    nc+=dc; nr+=dr;
+                }
+            });
+        } else if(type==='k'||type==='a'||type==='j'||type==='s') {
+             [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dc,dr])=>{
+                if((type==='k'||type==='j')&&dc*dr!==0) return; if((type==='a'||type==='s')&&dc*dr===0) return;
+                const nc=c+dc, nr=r+dr; if(nc>=3&&nc<=5&&((isRed&&nr>=7)||(!isRed&&nr<=2))) addMove(nc,nr);
+             });
+             if(type==='k' || type==='j') {
+                 let nr = r + (isRed ? -1 : 1);
+                 while(nr >= 0 && nr <= 9) {
+                     const tg = this.map[nr][c];
+                     if (tg) { if (tg === (isRed ? 'k' : 'K')) addMove(c, nr); break; }
+                     nr += (isRed ? -1 : 1);
+                 }
+             }
+        } else if(type==='b'||type==='x') {
+            [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(([dc,dr])=>{
+                const tc=c+dc, tr=r+dr;
+                if(tc>=0&&tc<=8&&tr>=0&&tr<=9) {
+                    const br=r+dr/2, bc=c+dc/2;
+                    if(br>=0&&br<10&&bc>=0&&bc<9 && !this.map[br][bc]) { if((isRed&&tr>=5)||(!isRed&&tr<=4)) addMove(tc,tr); }
+                }
+            });
+        }
+        return moves;
+    },
+
+    click(c, r) {
+        if(this.isAnimating) return; 
+        
+        if(this.editMode) {
+            if(this.editPiece === 'clear') this.map[r][c] = 0;
+            else this.map[r][c] = this.editPiece;
+            Sound.play('move'); this.draw(); return;
+        }
+
+        this.hintMove = null; 
+        const k = this.map[r][c];
+        const isMyPiece = k && ((this.turn === 'r' && k < 'a') || (this.turn === 'b' && k > 'Z'));
+
+        if(isMyPiece) {
+            this.sel = {c, r}; Sound.play('select');
+            const hints = this.getMoves(c, r); View.draw(this.map, this.sel, this.last, hints);
+            return;
+        }
+        if(this.sel) {
+            const valid = this.getMoves(this.sel.c, this.sel.r).find(m=>m.tc===c && m.tr===r);
+            if(valid) {
+                const saveT = this.map[r][c], saveF = this.map[this.sel.r][this.sel.c];
+                this.map[r][c] = saveF; this.map[this.sel.r][this.sel.c] = 0;
+                const kStr = this.map.flat().join('');
+                let repCount = 0;
+                for(let h of this.history) { if (h.flat().join('') === kStr) repCount++; }
+                const isCheck = !RulesUI.isLegal(this.map, this.turn==='b'); 
+                this.map[this.sel.r][this.sel.c] = saveF; this.map[r][c] = saveT; 
+
+                if(repCount >= 2) { 
+                    if(isCheck) {
+                        Sound.play('warn'); alert("裁决：长将判负！连续将军导致三次重复局面。"); return; 
+                    } else {
+                        Sound.play('warn'); this.end("裁决：三次重复局面，系统判定平局！"); return;
+                    }
+                }
+
+                if(!this.gameStarted) this.startGame();
+                
+                this.animateMove({fc:this.sel.c, fr:this.sel.r, tc:c, tr:r}, () => {
+                    if (this.mode === 'h-ai' && !this.gameOver && this.turn === 'b' && !this.autoPlay) {
+                        this.aiGo();
+                    }
+                });
+            }
+        }
+    },
+
+    animateMove(m, callback, scoreInfo = null) {
+        if(this.gameOver || this.isAnimating) return;
+        this.isAnimating = true; 
+        
+        const notation = this.getNotation(this.map, m);
+        
+        this.animPiece = this.map[m.fr][m.fc];
+        this.map[m.fr][m.fc] = 0; 
+        this.animM = m;
+        this.animStart = performance.now();
+        
+        const frame = (time) => {
+            let t = (time - this.animStart) / 160; 
+            if(t >= 1) t = 1;
+            let p = 1 - Math.pow(1 - t, 3); 
+            
+            if(t >= 1) {
+                this.map[m.fr][m.fc] = this.animPiece; 
+                this.animPiece = null;
+                this.animFrameId = null; 
+                this.executeMove(m, notation, scoreInfo);
+                this.isAnimating = false; 
+                if(callback) callback();
+            } else {
+                View.draw(this.map, this.sel, this.last, [], {m: this.animM, p: p, piece: this.animPiece});
+                this.animFrameId = requestAnimationFrame(frame); 
+            }
+        };
+        this.animFrameId = requestAnimationFrame(frame);
+    },
+
+    executeMove(m, notation, scoreInfo) {
+        this.history.push(JSON.parse(JSON.stringify(this.map)));
+        const t = this.map[m.tr][m.tc];
+        this.map[m.tr][m.tc] = this.map[m.fr][m.fc]; this.map[m.fr][m.fc] = 0;
+        
+        this.historyKeys.push(this.toKey(this.map));
+        this.last = m; this.sel = null; 
+        const isRedTurn = this.turn === 'r';
+        this.turn = isRedTurn ? 'b' : 'r';
+        this.timers.step = this.LIMIT_STEP;
+        
+        if(isRedTurn) this.movesCount++;
+        
+        const isCheck = !RulesUI.isLegal(this.map, !isRedTurn);
+
+        // 🟢 V41：系统日志“单行极简降噪”渲染
+        let logMsg = `<span style="opacity:0.5;font-family:monospace;">#${this.movesCount}</span> ` + (isRedTurn ? "🔴 " : "🟢 ") + notation;
+        if(t) {
+            const names = {'p':'卒','c':'砲','r':'車','n':'馬','b':'象','a':'士','k':'將','P':'兵','C':'炮','R':'车','N':'马','B':'相','A':'仕','K':'帅'};
+            logMsg += ` <span style="color:#ff453a;font-size:0.9em;font-weight:bold;margin-left:4px;">⚔️${names[t]||'子'}</span>`;
+            if (!isCheck) Sound.play('capture'); 
+        }
+
+        if(isCheck) {
+            logMsg += ` <span style="color:#ffd60a;font-weight:bold;margin-left:4px;">[将!]</span>`;
+            Sound.play('check');
+        } else if (!t) {
+            Sound.play('move');
+        }
+
+        if (scoreInfo) {
+            if (scoreInfo.isCloud) {
+                logMsg += ` <span style="color:#0a84ff;font-size:0.85em;font-family:monospace;margin-left:auto;">[☁️云端|${scoreInfo.val}]</span>`;
+            } else if (scoreInfo.val !== undefined && scoreInfo.depth !== "名谱") {
+                logMsg += ` <span style="color:#a1c9f7;font-size:0.85em;font-family:monospace;margin-left:auto;">[⚙️L${scoreInfo.depth}|${scoreInfo.val}]</span>`;
+            } else if (scoreInfo.depth === "名谱") {
+                logMsg += ` <span style="color:#30d158;font-size:0.85em;font-family:monospace;margin-left:auto;">[📖名谱]</span>`;
+            }
+        } else {
+            let s = this.evaluate();
+            logMsg += ` <span style="color:#888;font-size:0.85em;font-family:monospace;margin-left:auto;">[静态|${s}]</span>`;
+        }
+
+        if(t) {
+            const px = View.margin + (View.flipped ? 8 - m.tc : m.tc) * View.grid;
+            const py = View.margin + (View.flipped ? 9 - m.tr : m.tr) * View.grid;
+            Particles.add(px, py, t < 'a');
+        } else {
+            this.draw(); 
+        }
+        
+        let hasMove = false;
+        for(let r=0; r<10; r++) {
+            for(let c=0; c<9; c++) {
+                const p = this.map[r][c];
+                if(p && ((this.turn === 'r' && p < 'a') || (this.turn === 'b' && p > 'Z'))) {
+                    if(this.getMoves(c, r).length > 0) { hasMove = true; break; }
+                }
+            }
+            if(hasMove) break;
+        }
+        
+        UI.logHTML(logMsg);
+        this.uiUpdate();
+        
+        if(!hasMove) {
+            this.end(this.turn === 'r' ? "绝杀无解，黑方胜！" : "绝杀无解，红方胜！");
+            if(this.autoPlay) this.toggleAuto(); 
+        } else if (!this.gameOver && this.mode === 'h-h' && !this.autoPlay) {
+            UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
+        }
+    },
+
+    async aiGo() {
+        if(this.gameOver || this.isThinking || this.isAnimating) return;
+        this.isThinking = true;
+        UI.status("混动引擎时空演算中...", true);
+        const timeLimit = parseInt(document.getElementById('depth').value);
+        
+        await new Promise(r => setTimeout(r, 50));
+        const bestInfo = await this.runWorkers(this.map, timeLimit, this.history, this.turn);
+        
+        this.isThinking = false;
+        
+        if(this.gameOver || this.isInterrupted) return; 
+
+        if (!bestInfo) {
+            this.end(this.turn === 'r' ? "AI 系统判定：绝杀无解，黑方获胜！" : "AI 系统判定：绝杀无解，红方获胜！");
+            return;
+        }
+        
+        UI.status("红方走棋", false);
+        this.animateMove(bestInfo.move, null, bestInfo);
+    },
+
+    startGame() {
+        this.gameStarted = true; this.timers.step = this.LIMIT_STEP; 
+        if(this.timers.t) clearInterval(this.timers.t);
+        this.timers.t = setInterval(()=>{
+            if(this.gameOver || this.editMode || this.isAnimating) return;
+            this.timers.step--; 
+            if(this.turn==='r') this.timers.r--; else this.timers.b--;
+
+            if(this.timers.step <= 0) { this.end(this.turn==='r' ? "红方超时(步时)判负" : (this.mode==='h-ai'?"AI超时(步时)判负":"黑方超时(步时)判负")); return; }
+            if(this.timers.r <= 0) this.end("红方局时耗尽判负");
+            if(this.timers.b <= 0) this.end(this.mode==='h-ai'?"AI局时耗尽判负":"黑方局时耗尽判负");
+
+            this.uiUpdate();
+        }, 1000);
+    },
+
+    end(msg) {
+        this.gameOver = true; clearInterval(this.timers.t);
+        Sound.play(msg.includes('获胜')||msg.includes('胜')?'win':'lose');
+        setTimeout(()=>alert(msg), 100); UI.status(msg, false);
+    },
+
+    undo() {
+        if(this.gameOver || this.editMode || this.isAnimating) return;
+        this.resetWorkers(); 
+        this.isThinking = false; 
+        this.closeMenuIfMobile(); 
+        
+        if(this.mode === 'h-ai') {
+            if(this.history.length < 2 || this.turn !== 'r') return;
+            this.history.pop(); this.map = this.history.pop();
+            this.historyKeys.pop(); this.historyKeys.pop(); 
+            this.movesCount--;
+            this.turn = 'r';
+        } else {
+            if(this.history.length < 1) return;
+            this.map = this.history.pop();
+            this.historyKeys.pop();
+            if(this.turn === 'r') this.movesCount--;
+            this.turn = this.turn === 'r' ? 'b' : 'r';
+        }
+        
+        this.last = null; this.timers.step = this.LIMIT_STEP; 
+        Sound.play('select'); this.draw(); 
+        this.uiUpdate();
+        UI.status(this.turn==='r' ? "红方走棋" : "黑方走棋", false);
+    },
+
+    restart() { 
+        if(this.editMode) this.toggleEdit(); 
+        if(this.autoPlay) this.toggleAuto();
+        clearInterval(this.timers.t); Sound.play('select'); this.init(); 
+        this.closeMenuIfMobile(); 
+    },
+
+    uiUpdate() {
+        const fmt = s => `${String(Math.floor(Math.max(0, s)/60)).padStart(2,'0')}:${String(Math.max(0, s)%60).padStart(2,'0')}`;
+        const tr = document.getElementById('timeR'), tb = document.getElementById('timeB');
+        const sr = document.getElementById('stepR'), sb = document.getElementById('stepB');
+
+        if(tr) tr.innerText = fmt(this.timers.r); if(tb) tb.innerText = fmt(this.timers.b);
+        
+        const stepTxt = `REST ${this.timers.step}s`, isUrgent = this.timers.step < 15;
+
+        if(sr) { sr.innerText = this.turn==='r' && this.gameStarted ? stepTxt : ''; sr.className = isUrgent && this.turn==='r' ? 'step-timer urgent' : 'step-timer'; }
+        if(sb) { sb.innerText = this.turn==='b' && this.gameStarted ? stepTxt : ''; sb.className = isUrgent && this.turn==='b' ? 'step-timer urgent' : 'step-timer'; }
+        
+        document.getElementById('cellR').classList.toggle('active', this.turn==='r');
+        document.getElementById('cellB').classList.toggle('active', this.turn==='b');
+
+        const score = this.evaluate();
+        let displayScore = score;
+        let text = displayScore > 20 ? `🔴 红方优 +${displayScore}` : (displayScore < -20 ? `黑方优 +${-displayScore} 🟢` : '势均力敌');
+        let winPct = 50 + (displayScore / 30); 
+        winPct = Math.max(5, Math.min(95, winPct)); 
+        
+        const sbBar = document.getElementById('scoreBar');
+        if(sbBar) sbBar.style.width = winPct + '%';
+        const st = document.getElementById('scoreText');
+        if(st) {
+            st.innerText = text;
+            st.style.color = displayScore > 20 ? "var(--red)" : (displayScore < -20 ? "var(--black)" : "#fff");
+        }
+    }
+};
+
+const UI = {
+    log(s, type='') {
+        const b = document.getElementById('log');
+        while(b.children.length >= 60) b.removeChild(b.firstElementChild); 
+        const d = document.createElement('div'); 
+        d.className = type ? `log-line ${type}` : 'log-line'; 
+        d.innerText = `> ${s}`;
+        b.appendChild(d); 
+        b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' });
+    },
+    logHTML(htmlStr) {
+        const b = document.getElementById('log');
+        while(b.children.length >= 60) b.removeChild(b.firstElementChild);
+        const d = document.createElement('div'); 
+        d.className = 'log-line'; 
+        d.innerHTML = htmlStr;
+        b.appendChild(d); 
+        b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' });
+    },
+    status(s, busy) {
+        const t = document.getElementById('statusText'), d = document.getElementById('statusDot');
+        if(t) t.innerText = s; if(d) d.className = busy ? "dot thinking" : "dot";
+    }
+};
+
+window.onload = () => Game.init();
+</script>
+</body>
+</html>
