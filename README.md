@@ -1,4 +1,4 @@
-# ♟️ Chinese Chess Pro - V41 (单文件版)
+# ♟️ 中国象棋HTML5 (单文件版)
 
 [![Vanilla JS](https://img.shields.io/badge/JavaScript-Vanilla-f7df1e?logo=javascript&logoColor=black)](#)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-success)](#)
